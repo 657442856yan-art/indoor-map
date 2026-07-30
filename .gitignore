@@ -1,0 +1,9 @@
+# 本地含真实密钥的备份（不入库，避免泄露高德 Key）
+*.bak
+# Windows 快捷方式
+*.lnk
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+# 依赖
+node_modules/

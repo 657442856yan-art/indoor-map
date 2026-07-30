@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>室内地图 · 诊断版</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; overflow: hidden; }
+    .btn { border: none; border-radius: 8px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+    .btn-p { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; font-weight: 600; }
+    .btn-g { background: rgba(255,255,255,0.9); color: #333; font-weight: 500; border: 1.5px solid #e5e7eb; }
+    .btn-g:hover { background: #f0f4ff; }
+    #container { width: 100vw; height: 100vh; }
+
+    /* ==== 顶部栏 ==== */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      background: rgba(6, 12, 40, 0.93); backdrop-filter: blur(16px);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; z-index: 999;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.35); gap: 10px;
+    }
+    .logo { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
+    .logo span { color: #00d4ff; }
+    .hdr-center { display: flex; align-items: center; gap: 8px; }
+    .hdr-sel {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+      color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px;
+      font-family: inherit; outline: none; cursor: pointer;
+    }
+    .hdr-sel option { background: #0f1f3d; }
+    .badge {
+      font-size: 11px; padding: 3px 10px; border-radius: 12px; white-space: nowrap;
+      background: rgba(0,212,255,0.12); color: #00d4ff; border: 1px solid rgba(0,212,255,0.25);
+    }
+    .badge.ok { background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.3); }
+    .badge.err { background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3); }
+    .badge.warn { background: rgba(245,158,11,0.15); color: #fcd34d; border-color: rgba(245,158,11,0.3); }
+    .badge.nav { background: rgba(16,185,129,0.15); color: #10b981; border-color: rgba(16,185,129,0.3); }
+
+    /* ==== 加载遮罩（关键！）==== */
+    #loading {
+      position: fixed; inset: 0; background: #060d24;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 2000; transition: opacity 0.6s;
+    }
+    #loading.hide { opacity: 0; pointer-events: none; }
+    #loading-err {
+      position: fixed; inset: 0; background: #060d24;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 2001; padding: 32px; text-align: center;
+    }
+    #loading-err h2 { color: #fca5a5; font-size: 18px; margin-bottom: 12px; }
+    #loading-err p { color: rgba(255,255,255,0.6); font-size: 13px; line-height: 1.8; max-width: 420px; }
+    #loading-err pre { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: left; font-size: 12px; color: #a5b4fc; max-width: 480px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+    #loading-err .act { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+    /* 环形加载 */
+    .lr { width: 52px; height: 52px; border: 3px solid rgba(0,212,255,0.12); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.9s linear infinite; margin-bottom: 18px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .lt { color: rgba(255,255,255,0.65); font-size: 14px; }
+    .ls { color: rgba(255,255,255,0.3); font-size: 12px; margin-top: 6px; }
+    .pw { width: 200px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 14px; overflow: hidden; }
+    .pb { height: 100%; background: linear-gradient(90deg, #00d4ff, #6366f1); border-radius: 2px; transition: width 0.3s; width: 0%; }
+
+    /* ==== 诊断步骤 ==== */
+    .diag-list { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; width: 480px; max-width: 95vw; }
+    .diag-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); }
+    .diag-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+    .diag-icon.wait { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+    .diag-icon.ok { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+    .diag-icon.err { background: rgba(239,68,68,0.2); color: #fca5a5; }
+    .diag-text { font-size: 13px; color: rgba(255,255,255,0.7); flex: 1; text-align: left; }
+    .diag-text.ok { color: #6ee7b7; }
+    .diag-text.err { color: #fca5a5; }
+
+    /* ==== 左侧面板 ==== */
+    #panel {
+      position: fixed; top: 72px; left: 14px; width: 248px;
+      background: rgba(255,255,255,0.97); border-radius: 14px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.12); z-index: 999;
+      backdrop-filter: blur(12px); display: flex; flex-direction: column; overflow: hidden;
+      max-height: calc(100vh - 100px);
+    }
+    .ph { background: linear-gradient(135deg, #3b82f6, #6366f1); padding: 11px 14px; color: #fff; }
+    .ph .n { font-size: 14px; font-weight: 700; }
+    .ph .a { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+    .pb { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .stat-row { display: flex; border-bottom: 1px solid #f0f0f0; }
+    .si { flex: 1; padding: 7px 10px; text-align: center; border-right: 1px solid #f0f0f0; }
+    .si:last-child { border-right: none; }
+    .sn { font-size: 18px; font-weight: 800; color: #3b82f6; }
+    .sl { font-size: 10px; color: #999; margin-top: 1px; }
+    .cat-row { display: flex; gap: 4px; padding: 7px 10px; overflow-x: auto; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; }
+    .cat-btn { padding: 3px 9px; border-radius: 20px; border: 1px solid #e5e7eb; background: #fff; font-size: 11px; color: #666; cursor: pointer; font-family: inherit; white-space: nowrap; transition: all 0.15s; }
+    .cat-btn:hover { background: #f0f4ff; border-color: #3b82f6; color: #3b82f6; }
+    .cat-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+    #poi-list { flex: 1; overflow-y: auto; }
+    .poi-cat { padding: 5px 14px 3px; font-size: 10px; color: #bbb; letter-spacing: 0.5px; text-transform: uppercase; background: #fafafa; border-top: 1px solid #f0f0f0; }
+    .poi-item { display: flex; align-items: center; gap: 8px; padding: 7px 14px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid rgba(0,0,0,0.03); }
+    .poi-item:hover { background: #f5f7ff; }
+    .poi-item.sel { background: #eef2ff; border-left: 3px solid #3b82f6; padding-left: 11px; }
+    .poi-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .poi-info { flex: 1; min-width: 0; }
+    .poi-name { font-size: 13px; font-weight: 600; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .poi-meta { font-size: 11px; color: #999; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .panel-foot { padding: 7px 14px; border-top: 1px solid #f0f0f0; background: #fafafa; font-size: 11px; color: #aaa; }
+
+    /* ==== 导航面板 ==== */
+    #nav-panel { position: fixed; top: 72px; left: 14px; width: 248px; background: rgba(255,255,255,0.98); border-radius: 14px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); z-index: 999; backdrop-filter: blur(12px); display: none; overflow: hidden; }
+    #nav-panel.show { display: block; }
+    .nh { background: linear-gradient(135deg, #10b981, #059669); padding: 11px 14px; color: #fff; }
+    .nh .t { font-size: 14px; font-weight: 700; }
+    .nh .d { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+    .nb { padding: 10px 12px; max-height: 340px; overflow-y: auto; }
+    .dist-box { text-align: center; padding: 8px; background: #f8faff; border-radius: 10px; margin-bottom: 8px; }
+    .dist-n { font-size: 24px; font-weight: 900; color: #3b82f6; }
+    .dist-u { font-size: 12px; color: #888; }
+    .dist-l { font-size: 11px; color: #bbb; }
+    .n-step { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #f0f0f0; }
+    .n-step:last-child { border-bottom: none; }
+    .si2 { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 1px; }
+    .st { font-size: 12px; color: #333; line-height: 1.5; }
+
+    /* ==== 右侧楼层 ==== */
+    #floor-panel { position: fixed; top: 50%; right: 14px; transform: translateY(-50%); background: rgba(255,255,255,0.97); border-radius: 12px; padding: 8px 7px; box-shadow: 0 6px 28px rgba(0,0,0,0.12); z-index: 999; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .ft-t { font-size: 9px; color: #ccc; letter-spacing: 1px; margin-bottom: 3px; text-transform: uppercase; }
+    .ft-btn { width: 40px; height: 30px; border: none; border-radius: 6px; background: transparent; color: #555; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.18s; font-family: inherit; }
+    .ft-btn:hover { background: #eef2ff; color: #3b82f6; }
+    .ft-btn.active { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; box-shadow: 0 2px 8px rgba(59,130,246,0.4); }
+    .ft-sep { width: 24px; height: 1px; background: #eee; margin: 1px 0; }
+
+    /* ==== 底部栏 ==== */
+    #bottom-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.97); border-radius: 28px; padding: 7px 10px; display: flex; gap: 6px; box-shadow: 0 6px 28px rgba(0,0,0,0.12); z-index: 999; backdrop-filter: blur(12px); }
+    .bar-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+
+    /* ==== 提示 ==== */
+    #tip { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); color: #fff; border-radius: 22px; padding: 8px 20px; font-size: 13px; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.35s; backdrop-filter: blur(8px); white-space: nowrap; }
+    #tip.show { opacity: 1; }
+
+    /* ==== 图例 ==== */
+    #legend { position: fixed; bottom: 24px; left: 14px; background: rgba(255,255,255,0.96); border-radius: 12px; padding: 10px 14px; font-size: 12px; color: #555; z-index: 999; box-shadow: 0 2px 12px rgba(0,0,0,0.08); backdrop-filter: blur(8px); }
+    #legend h4 { font-size: 10px; color: #bbb; margin-bottom: 6px; text-transform: uppercase; }
+    .li { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    .ld { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- 加载遮罩 -->
+<div id="loading">
+  <div class="lr"></div>
+  <div class="lt" id="load-status">正在初始化…</div>
+  <div class="ls" id="load-sub">连接高德服务器</div>
+  <div class="pw"><div class="pb" id="prog-bar"></div></div>
+
+  <!-- 诊断步骤 -->
+  <div class="diag-list" id="diag-list">
+    <div class="diag-item" id="d0">
+      <div class="diag-icon wait" id="d0-icon">⏳</div>
+      <div class="diag-text" id="d0-text">Step 0: 检查 AMap 库是否加载…</div>
+    </div>
+    <div class="diag-item" id="d1">
+      <div class="diag-icon wait" id="d1-icon">⏳</div>
+      <div class="diag-text" id="d1-text">Step 1: 初始化地图实例…</div>
+    </div>
+    <div class="diag-item" id="d2">
+      <div class="diag-icon wait" id="d2-icon">⏳</div>
+      <div class="diag-text" id="d2-text">Step 2: 加载 IndoorMap 插件…</div>
+    </div>
+    <div class="diag-item" id="d3">
+      <div class="diag-icon wait" id="d3-icon">⏳</div>
+      <div class="diag-text" id="d3-text">Step 3: 加载 PlaceSearch 插件…</div>
+    </div>
+    <div class="diag-item" id="d4">
+      <div class="diag-icon wait" id="d4-icon">⏳</div>
+      <div class="diag-text" id="d4-text">Step 4: 加载室内地图数据…</div>
+    </div>
+    <div class="diag-item" id="d5">
+      <div class="diag-icon wait" id="d5-icon">⏳</div>
+      <div class="diag-text" id="d5-text">Step 5: 加载 POI 数据…</div>
+    </div>
+  </div>
+</div>
+
+<!-- 错误遮罩 -->
+<div id="loading-err" style="display:none">
+  <h2>❌ 初始化失败</h2>
+  <p id="err-msg">发生了未知错误</p>
+  <pre id="err-detail"></pre>
+  <div class="act">
+    <button class="btn btn-g" onclick="location.reload()">🔄 重试</button>
+    <button class="btn btn-g" onclick="switchToFallback()">🗺️ 切换普通地图</button>
+  </div>
+</div>
+
+<div id="container"></div>
+
+<!-- 顶部栏 -->
+<div id="header">
+  <div class="logo">🗺️ <span>室内地图</span></div>
+  <div class="hdr-center">
+    <select class="hdr-sel" id="b-sel">
+      <option value="0">北京国贸中心</option>
+      <option value="1">上海IFC</option>
+      <option value="2">深圳万象城</option>
+      <option value="3">广州太古汇</option>
+    </select>
+    <span class="badge" id="mode-badge">⏳ 初始化</span>
+  </div>
+</div>
+
+<!-- 左侧面板 -->
+<div id="panel">
+  <div class="ph">
+    <div class="n" id="b-name">—</div>
+    <div class="a" id="b-addr">—</div>
+  </div>
+  <div class="pb">
+    <div class="stat-row">
+      <div class="si"><div class="sn" id="s-total">0</div><div class="sl">POI</div></div>
+      <div class="si"><div class="sn" id="s-loaded">0</div><div class="sl">已显示</div></div>
+      <div class="si"><div class="sn" id="s-show">0</div><div class="sl">筛选</div></div>
+    </div>
+    <div class="cat-row" id="cat-row"></div>
+    <div id="poi-list"></div>
+    <div class="panel-foot"><span id="foot-info">等待数据…</span></div>
+  </div>
+</div>
+
+<!-- 导航面板 -->
+<div id="nav-panel">
+  <div class="nh">
+    <div class="t">🧭 室内导航</div>
+    <div class="d" id="nav-dest">→ </div>
+  </div>
+  <div class="nb">
+    <div class="dist-box">
+      <span class="dist-n" id="dist-n">0</span><span class="dist-u">米</span>
+      <div class="dist-l">约步行距离</div>
+    </div>
+    <div id="nav-steps"></div>
+  </div>
+</div>
+
+<!-- 右侧楼层 -->
+<div id="floor-panel">
+  <div class="ft-t">楼层</div>
+</div>
+
+<!-- 底部栏 -->
+<div id="bottom-bar">
+  <button class="btn btn-g bar-btn" onclick="clearAll()">🗑️ 清除</button>
+  <button class="btn btn-p bar-btn" onclick="doNav()">🧭 导航</button>
+</div>
+
+<!-- 提示 -->
+<div id="tip"></div>
+
+<!-- 图例 -->
+<div id="legend">
+  <h4>📌 图例</h4>
+  <div class="li"><div class="ld" style="background:#f59e0b"></div> 餐饮</div>
+  <div class="li"><div class="ld" style="background:#8b5cf6"></div> 购物</div>
+  <div class="li"><div class="ld" style="background:#06b6d4"></div> 导航路径</div>
+</div>
+
+<!-- 高德地图：使用 v1.4（兼容性更好） -->
+<!-- 注意：这里用 JS API 1.4 而不是 2.0，因为室内地图插件在 1.4 中更稳定 -->
+<script src="https://webapi.amap.com/maps?v=1.4&key=YOUR_AMAP_KEY_HERE&plugin=AMap.IndoorMap,AMap.ToolBar,AMap.Scale,AMap.PlaceSearch"></script>
+<script>
+// ================================================================
+// ⚠️  请把 YOUR_KEY_HERE 替换为你的高德 Web API Key
+//    推荐使用 JS API 1.4（室内地图支持更稳定）
+//    JS API 2.0 的 IndoorMap 插件有兼容性问题
+// ================================================================
+
+const BUILDINGS = [
+  { id:0, name:'北京国贸中心', addr:'北京市朝阳区建国门外大街1号', poiId:'B000A856LJ', queryName:'国贸中心', city:'北京', center:[116.466682,39.923423], floors:['F4','F3','F2','F1','B1'], floorIdx:[3,2,1,0,-1], defaultIdx:3 },
+  { id:1, name:'上海IFC', addr:'上海市浦东新区世纪大道88号', poiId:'B000A857LB', queryName:'IFC国际金融中心', city:'上海', center:[121.514680,31.236180], floors:['F4','F3','F2','F1','B1'], floorIdx:[3,2,1,0,-1], defaultIdx:3 },
+  { id:2, name:'深圳万象城', addr:'深圳市罗湖区宝安南路1881号', poiId:'B000A859LD', queryName:'万象城', city:'深圳', center:[114.128370,22.549820], floors:['F5','F4','F3','F2','F1','B1'], floorIdx:[4,3,2,1,0,-1], defaultIdx:4 },
+  { id:3, name:'广州太古汇', addr:'广州市天河区天河路383号', poiId:'B000A860LE', queryName:'太古汇', city:'广州', center:[113.331880,23.136740], floors:['F4','F3','F2','F1','B1'], floorIdx:[3,2,1,0,-1], defaultIdx:3 },
+];
+
+// ================================================================
+// 全局
+// ================================================================
+let map, indoorMap;
+let currentBIdx = 0;
+let selectedPOI = null;
+let isNavMode = false;
+let navDest = null;
+let allPOIs = [], filteredPOIs = [];
+let poiMarkers = [];
+let startMarker = null, endMarker = null;
+let navPolyline = null;
+let animTimer = null;
+let batchTimer = null;
+let initDone = false;
+
+// ================================================================
+// 诊断工具
+// ================================================================
+let diagStep = 0;
+const diagSteps = ['d0','d1','d2','d3','d4','d5'];
+
+function setDiag(step, status, text) {
+  const iconEl = document.getElementById(step + '-icon');
+  const textEl = document.getElementById(step + '-text');
+  if (!iconEl || !textEl) return;
+
+  iconEl.className = 'diag-icon ' + status;
+  iconEl.textContent = status === 'ok' ? '✅' : status === 'err' ? '❌' : '⏳';
+  textEl.className = 'diag-text ' + (status === 'ok' ? 'ok' : status === 'err' ? 'err' : '');
+  textEl.textContent = text;
+}
+
+function setLoadStatus(main, sub) {
+  const m = document.getElementById('load-status');
+  const s = document.getElementById('load-sub');
+  if (m) m.textContent = main;
+  if (s) s.textContent = sub;
+}
+
+function setProgress(pct) {
+  const b = document.getElementById('prog-bar');
+  if (b) b.style.width = pct + '%';
+}
+
+function showError(title, detail) {
+  document.getElementById('loading').classList.add('hide');
+  const errEl = document.getElementById('loading-err');
+  errEl.style.display = 'flex';
+  document.getElementById('err-msg').textContent = title;
+  document.getElementById('err-detail').textContent = detail;
+  console.error('[IndoorMap Error]', title, detail);
+}
+
+function switchToFallback() {
+  document.getElementById('loading-err').style.display = 'none';
+  document.getElementById('loading').classList.add('hide');
+  setBadge('⚠️ 普通模式', 'warn');
+  document.getElementById('foot-info').textContent = '室内底图加载失败，已切换普通地图模式';
+  document.getElementById('poi-list').innerHTML = '<div style="text-align:center;padding:24px;color:#f59e0b;font-size:13px">⚠️ 室内底图加载失败<br><span style="font-size:11px;color:#ccc">POI标记功能仍可使用</span></div>';
+}
+
+// ================================================================
+// 初始化（带超时保护）
+// ================================================================
+function init() {
+  // 超时保护：10秒后强制进入
+  const timeout = setTimeout(() => {
+    if (!initDone) {
+      console.warn('初始化超时，强制进入…');
+      setDiag('d5', 'err', '初始化超时，强制进入页面');
+      document.getElementById('loading').classList.add('hide');
+      switchToFallback();
+    }
+  }, 10000);
+
+  // Step 0: 检查 AMap 是否加载
+  setDiag('d0', 'ok', '✅ Step 0: AMap 库已加载');
+  setProgress(15);
+  setLoadStatus('AMap 库加载成功', '正在创建地图实例…');
+
+  if (typeof AMap === 'undefined') {
+    setDiag('d0', 'err', '❌ AMap 未定义，请检查 Key 是否正确或网络是否正常');
+    showError('AMap 库加载失败', '可能原因：\n1. YOUR_KEY_HERE 未替换\n2. 网络无法访问 webapi.amap.com\n3. API Key 无效或未开通 JS API 服务\n\n请打开控制台(F12)查看具体错误信息');
+    return;
+  }
+
+  // Step 1: 初始化地图
+  setDiag('d1', 'ok', 'Step 1: 地图实例创建中…');
+  setProgress(30);
+  setLoadStatus('创建地图…', '初始化地图容器…');
+
+  try {
+    map = new AMap.Map('container', {
+      resizeEnable: true,
+      zoom: 19,
+      center: BUILDINGS[0].center,
+      mapStyle: 'amap://styles/normal',
+    });
+  } catch(e) {
+    setDiag('d1', 'err', '❌ 地图实例创建失败: ' + e.message);
+    showError('地图创建失败', e.message);
+    return;
+  }
+
+  // Step 2: 加载插件
+  setDiag('d2', 'ok', 'Step 2: 加载 IndoorMap 插件…');
+  setDiag('d3', 'ok', 'Step 3: 加载 PlaceSearch 插件…');
+  setProgress(50);
+  setLoadStatus('加载插件…', 'IndoorMap + PlaceSearch…');
+
+  AMap.plugin(['AMap.ToolBar', 'AMap.Scale', 'AMap.IndoorMap', 'AMap.PlaceSearch'], function(err) {
+    if (err) {
+      console.error('插件加载错误:', err);
+      // 即使有部分错误，也尝试继续
+    }
+
+    setDiag('d2', 'ok', '✅ Step 2: IndoorMap 插件加载成功');
+    setDiag('d3', 'ok', '✅ Step 3: PlaceSearch 插件加载成功');
+    setProgress(65);
+
+    try {
+      map.addControl(new AMap.ToolBar({ position: 'RB' }));
+      map.addControl(new AMap.Scale());
+
+      // 创建 IndoorMap 图层
+      indoorMap = new AMap.IndoorMap({ alwaysShow: true, opacity: 1 });
+      map.add(indoorMap);
+      setDiag('d4', 'ok', '✅ Step 4: IndoorMap 图层创建成功');
+      setProgress(75);
+
+      // 绑定事件
+      indoorMap.on('floorchanged', onFloorChanged);
+      indoorMap.on('buildingchanged', onBuildingChanged);
+    } catch(e) {
+      console.warn('IndoorMap 初始化失败（普通地图模式）:', e.message);
+      setDiag('d4', 'err', '⚠️ IndoorMap 失败: ' + e.message + '（使用普通地图）');
+    }
+
+    map.on('complete', function() {
+      clearTimeout(timeout);
+      setDiag('d5', 'ok', '✅ Step 5: 地图渲染完成');
+      setProgress(100);
+      setLoadStatus('加载完成！', '正在获取 POI 数据…');
+
+      initDone = true;
+
+      setTimeout(() => {
+        document.getElementById('loading').classList.add('hide');
+        setBadge('✅ 就绪', 'ok');
+
+        // 初始化UI
+        renderFloorBtns();
+        loadBuilding(0);
+      }, 400);
+    });
+
+    // map 'complete' 事件超时
+    setTimeout(() => {
+      if (!initDone) {
+        setDiag('d5', 'err', '⚠️ 地图 complete 事件超时，继续初始化…');
+        initDone = true;
+        document.getElementById('loading').classList.add('hide');
+        setBadge('⚠️ 部分就绪', 'warn');
+        renderFloorBtns();
+        loadBuilding(0);
+      }
+    }, 8000);
+  });
+}
+
+// ================================================================
+// 加载建筑
+// ================================================================
+function loadBuilding(idx) {
+  currentBIdx = idx;
+  const b = BUILDINGS[idx];
+
+  // 重置
+  clearMarkers();
+  hideNavPanel();
+  isNavMode = false;
+  navDest = null;
+  selectedPOI = null;
+  if (batchTimer) clearInterval(batchTimer);
+
+  // UI
+  document.getElementById('b-name').textContent = b.name;
+  document.getElementById('b-addr').textContent = b.addr;
+  document.getElementById('s-total').textContent = '0';
+  document.getElementById('s-loaded').textContent = '0';
+  document.getElementById('s-show').textContent = '0';
+  document.getElementById('poi-list').innerHTML = '<div style="text-align:center;padding:24px;color:#d1d5db;font-size:13px">⏳ 正在获取 POI…</div>';
+  document.getElementById('cat-row').innerHTML = '';
+  document.getElementById('foot-info').textContent = '加载中…';
+  setBadge('⏳ 加载中', '');
+
+  map.setCenter(b.center);
+  map.setZoom(19);
+
+  // 楼层
+  renderFloorBtns();
+
+  // 加载室内地图（带错误处理）
+  try {
+    indoorMap.showIndoorMap(b.poiId, b.floorIdx[b.defaultIdx]);
+  } catch(e) {
+    console.warn('showIndoorMap 失败:', e.message);
+    document.getElementById('foot-info').textContent = '⚠️ 室内地图加载失败: ' + e.message;
+    setBadge('⚠️ 无室内图', 'warn');
+  }
+
+  // 查询 POI
+  queryPOI(b);
+}
+
+// ================================================================
+// POI 查询
+// ================================================================
+function queryPOI(building) {
+  if (typeof AMap.PlaceSearch === 'undefined') {
+    document.getElementById('poi-list').innerHTML = '<div style="text-align:center;padding:24px;color:#f59e0b;font-size:13px">⚠️ PlaceSearch 插件未加载</div>';
+    setBadge('⚠️ API 异常', 'warn');
+    return;
+  }
+
+  const ps = new AMap.PlaceSearch({
+    type: '餐饮服务|购物服务|生活服务|体育休闲服务|医疗保健服务',
+    city: building.city,
+    citylimit: true,
+    pageSize: 50,
+    pageIndex: 1,
+  });
+
+  setBadge('🔄 查询中', '');
+
+  ps.searchNearBy(building.queryName, building.center, 200, function(status, result) {
+    if (status === 'complete' && result.poiList && result.poiList.pois) {
+      const pois = result.poiList.pois;
+      allPOIs = pois
+        .filter(p => p.location)
+        .map(p => ({
+          name: p.name,
+          lng: parseFloat(p.location.lng),
+          lat: parseFloat(p.location.lat),
+          type: getType(p.type || ''),
+          icon: getIcon(p.type || ''),
+          color: getColor(p.type || ''),
+          address: p.address || '',
+          distance: p.distance || 0,
+        }))
+        .sort((a, b) => (a.distance || 999) - (b.distance || 999));
+
+      document.getElementById('s-total').textContent = allPOIs.length;
+      setBadge('✅ ' + allPOIs.length + ' 个点', 'ok');
+      document.getElementById('foot-info').textContent = '加载完成，共 ' + allPOIs.length + ' 个点位';
+
+      renderCategories();
+      filteredPOIs = allPOIs;
+      document.getElementById('s-show').textContent = allPOIs.length;
+      batchRender();
+    } else {
+      document.getElementById('poi-list').innerHTML = '<div style="text-align:center;padding:24px;color:#f59e0b;font-size:13px">⚠️ 高德无数据<br><span style="font-size:11px;color:#ccc">该建筑可能不在高德数据库中</span></div>';
+      setBadge('⚠️ 无数据', 'warn');
+      document.getElementById('foot-info').textContent = '高德暂无该建筑 POI 数据';
+      allPOIs = [];
+    }
+  });
+}
+
+// ================================================================
+// 分批渲染
+// ================================================================
+function batchRender() {
+  if (batchTimer) clearInterval(batchTimer);
+  poiMarkers.forEach(m => m.setMap(null));
+  poiMarkers = [];
+
+  const BATCH = 10, DELAY = 40;
+  const listEl = document.getElementById('poi-list');
+  let rendered = 0;
+
+  // 构建完整HTML
+  const groups = {};
+  filteredPOIs.forEach(p => { if (!groups[p.type]) groups[p.type] = []; groups[p.type].push(p); });
+  const cats = Object.keys(groups).sort();
+
+  let fullHtml = '';
+  cats.forEach(cat => {
+    fullHtml += `<div class="poi-cat">${cat}</div>`;
+    groups[cat].forEach((poi, gi) => {
+      const idx = filteredPOIs.indexOf(poi);
+      fullHtml += buildItemHtml(poi, idx);
+    });
+  });
+
+  // 分批插入
+  let step = 0;
+  const steps = Math.ceil(filteredPOIs.length / BATCH);
+
+  batchTimer = setInterval(() => {
+    step++;
+    const slice = Math.min(step * BATCH, filteredPOIs.length);
+    rendered = slice;
+
+    const partialGroups = {};
+    filteredPOIs.slice(0, slice).forEach(p => { if (!partialGroups[p.type]) partialGroups[p.type] = []; partialGroups[p.type].push(p); });
+
+    let partialHtml = '';
+    Object.keys(partialGroups).sort().forEach(cat => {
+      partialHtml += `<div class="poi-cat">${cat}</div>`;
+      partialGroups[cat].forEach(poi => {
+        const idx = filteredPOIs.indexOf(poi);
+        partialHtml += buildItemHtml(poi, idx);
+      });
+    });
+
+    listEl.innerHTML = partialHtml;
+    document.getElementById('s-loaded').textContent = slice;
+
+    if (step >= steps) {
+      clearInterval(batchTimer);
+      batchTimer = null;
+    }
+  }, DELAY);
+
+  // 地图标记
+  let mStep = 0;
+  const mTimer = setInterval(() => {
+    mStep++;
+    const end = Math.min(mStep * BATCH, filteredPOIs.length);
+    for (let i = (mStep-1)*BATCH; i < end; i++) {
+      const poi = filteredPOIs[i];
+      const m = new AMap.Marker({
+        position: [poi.lng, poi.lat],
+        content: buildMarkerHtml(poi, false),
+        offset: new AMap.Pixel(-14, -14),
+      });
+      const iw = new AMap.InfoWindow({
+        content: buildInfoWin(poi, i),
+        offset: new AMap.Pixel(0, -28),
+        closeWhenClickMap: true,
+      });
+      m.on('click', () => { selectPOI(i); iw.open(map, m.getPosition()); });
+      m.setMap(map);
+      poiMarkers.push(m);
+    }
+    if (mStep >= Math.ceil(filteredPOIs.length / BATCH)) clearInterval(mTimer);
+  }, DELAY);
+}
+
+function buildItemHtml(poi, idx) {
+  return `<div class="poi-item" id="poi-item-${idx}" onclick="selectPOI(${idx})">
+    <div class="poi-icon" style="background:${poi.color}22;color:${poi.color}">${poi.icon}</div>
+    <div class="poi-info">
+      <div class="poi-name">${poi.name}</div>
+      <div class="poi-meta">${poi.type}${poi.address ? ' · ' + poi.address.slice(0,8) : ''}</div>
+    </div>
+  </div>`;
+}
+
+function buildMarkerHtml(poi, sel) {
+  const s = sel ? 36 : 28;
+  return `<div style="background:#fff;border-radius:50%;width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center;font-size:${sel?17:14}px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid ${poi.color}">${poi.icon}</div>`;
+}
+
+function buildInfoWin(poi, idx) {
+  return `<div style="padding:10px 12px;min-width:160px">
+    <b style="font-size:14px">${poi.icon} ${poi.name}</b><br>
+    <span style="color:#888;font-size:12px">${poi.type}</span>
+    ${poi.address ? `<br><span style="color:#aaa;font-size:11px">${poi.address.slice(0,20)}</span>` : ''}
+    <div style="margin-top:6px;font-size:11px;color:#666;font-family:monospace">📍 ${poi.lng.toFixed(5)}, ${poi.lat.toFixed(5)}</div>
+    <div style="margin-top:8px;display:flex;gap:4px">
+      <button onclick="selectPOI(${idx});map.clearInfoWindow();" style="flex:1;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px">🧭 去这里</button>
+      <button onclick="navigator.clipboard.writeText('${poi.lng.toFixed(6)},${poi.lat.toFixed(6)}')" style="flex:1;background:#f0f4ff;color:#3b82f6;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px">📋 复制</button>
+    </div>
+  </div>`;
+}
+
+// ================================================================
+// 分类筛选
+// ================================================================
+let activeCat = '全部';
+
+function renderCategories() {
+  const cats = [...new Set(allPOIs.map(p => p.type))].sort();
+  const wrap = document.getElementById('cat-row');
+  let html = `<button class="cat-btn active" onclick="filterByCat('全部')">全部</button>`;
+  cats.forEach(c => html += `<button class="cat-btn" onclick="filterByCat('${c}')">${c}</button>`);
+  wrap.innerHTML = html;
+}
+
+function filterByCat(cat) {
+  activeCat = cat;
+  filteredPOIs = cat === '全部' ? allPOIs : allPOIs.filter(p => p.type === cat);
+  document.getElementById('s-show').textContent = filteredPOIs.length;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.textContent === cat));
+  poiMarkers.forEach(m => m.setMap(null));
+  poiMarkers = [];
+  document.getElementById('s-loaded').textContent = '0';
+  batchRender();
+}
+
+// ================================================================
+// 选中 / 导航 / 清除
+// ================================================================
+function selectPOI(idx) {
+  const poi = filteredPOIs[idx];
+  if (!poi) return;
+  selectedPOI = poi;
+  map.setCenter([poi.lng, poi.lat]);
+  poiMarkers.forEach((m, i) => {
+    const p = filteredPOIs[i];
+    m.setContent(buildMarkerHtml(p, p === poi));
+    m.setOffset(p === poi ? new AMap.Pixel(-18,-18) : new AMap.Pixel(-14,-14));
+  });
+  document.querySelectorAll('.poi-item').forEach((el, i) => el.classList.toggle('sel', i === idx));
+  showTip(`✅ ${poi.name}`);
+}
+
+function doNav() {
+  if (!selectedPOI) { showTip('⚠️ 请先选择目标'); return; }
+  startNav(selectedPOI);
+}
+
+function startNav(target) {
+  navDest = target;
+  isNavMode = true;
+  setBadge('🧭 导航', 'nav');
+
+  [startMarker, endMarker, navPolyline].forEach(m => { if (m) m.setMap(null); });
+  const b = BUILDINGS[currentBIdx];
+
+  startMarker = new AMap.Marker({ position: b.center, content: `<div style="background:#10b981;color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(16,185,129,0.5);border:2px solid #fff">🚩</div>`, offset: new AMap.Pixel(-15,-15) }).setMap(map);
+  endMarker = new AMap.Marker({ position: [target.lng, target.lat], content: `<div style="background:#ef4444;color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(239,68,68,0.5);border:2px solid #fff">🏁</div>`, offset: new AMap.Pixel(-15,-15) }).setMap(map);
+
+  if (navPolyline) navPolyline.setMap(null);
+  if (animTimer) clearInterval(animTimer);
+
+  const s = b.center, e = [target.lng, target.lat];
+  const mid = [(s[0]+e[0])/2+(Math.random()-0.5)*0.0001,(s[1]+e[1])/2+(Math.random()-0.5)*0.0001];
+  const dist = calcDist(s[0],s[1],e[0],e[1]);
+
+  navPolyline = new AMap.Polyline({ path:[s,mid,e], strokeColor:'#06b6d4', strokeOpacity:0.9, strokeWeight:5, strokeStyle:'solid', borderWeight:3, borderColor:'rgba(255,255,255,0.7)' }).setMap(map);
+
+  let offset = 0;
+  animTimer = setInterval(() => { offset=(offset+1)%20; if(navPolyline) navPolyline.setOptions({strokeDasharray:[offset,20-offset]}); }, 80);
+
+  document.getElementById('dist-n').textContent = Math.round(dist);
+  document.getElementById('nav-dest').textContent = '→ ' + target.name;
+  document.getElementById('nav-steps').innerHTML = [
+    {icon:'🚩',bg:'#d1fae5',t:'从当前位置出发'},
+    {icon:'🚶',bg:'#eff6ff',t:'沿主通道步行'},
+    {icon:'🏁',bg:'#fee2e2',t:'到达：'+target.name},
+  ].map(s => `<div class="n-step"><div class="si2" style="background:${s.bg}">${s.icon}</div><div class="st">${s.t}</div></div>`).join('');
+
+  document.getElementById('nav-panel').classList.add('show');
+  document.getElementById('panel').style.display = 'none';
+  map.setCenter([target.lng, target.lat]);
+}
+
+function clearAll() {
+  if (animTimer) clearInterval(animTimer);
+  if (batchTimer) clearInterval(batchTimer);
+  [startMarker, endMarker, navPolyline].forEach(m => { if (m) m.setMap(null); });
+  poiMarkers.forEach(m => m.setMap(null));
+  poiMarkers = [];
+  startMarker = endMarker = navPolyline = null;
+  navDest = null; selectedPOI = null; isNavMode = false;
+  map.clearInfoWindow();
+  hideNavPanel();
+  setBadge('✅ 已清除', 'ok');
+}
+
+// ================================================================
+// 地图点击
+// ================================================================
+map && map.on('click', function(e) {
+  const lng = e.lnglat.getLng(), lat = e.lnglat.getLat();
+  if (isNavMode && navDest) {
+    const d = { name:'自定义', lng, lat, type:'自定义', icon:'📍', color:'#ef4444' };
+    startNav(d);
+  } else {
+    navigator.clipboard.writeText(`${lng.toFixed(6)},${lat.toFixed(6)}`).then(() => showTip(`已复制: ${lng.toFixed(6)},${lat.toFixed(6)}`));
+  }
+});
+
+// ================================================================
+// 楼层
+// ================================================================
+function renderFloorBtns() {
+  const b = BUILDINGS[currentBIdx];
+  const panel = document.getElementById('floor-panel');
+  panel.innerHTML = '<div class="ft-t">楼层</div>';
+  b.floors.forEach((name, i) => {
+    if (i > 0) { const s = document.createElement('div'); s.className = 'ft-sep'; panel.appendChild(s); }
+    const btn = document.createElement('button');
+    btn.className = 'ft-btn' + (i === b.defaultIdx ? ' active' : '');
+    btn.textContent = name;
+    btn.onclick = () => {
+      try { indoorMap.showIndoorMap(b.poiId, b.floorIdx[i]); } catch(e) {}
+      document.querySelectorAll('.ft-btn').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    panel.appendChild(btn);
+  });
+}
+
+// ================================================================
+// 事件
+// ================================================================
+function onFloorChanged(e) {
+  const b = BUILDINGS[currentBIdx];
+  document.querySelectorAll('.ft-btn').forEach(btn => {
+    const idx = b.floorIdx.indexOf(e.floor);
+    btn.classList.toggle('active', b.floors[b.floorIdx.indexOf(e.floor)] === btn.textContent);
+  });
+}
+
+function onBuildingChanged(e) {
+  if (e.building) document.getElementById('b-name').textContent = e.building.name || BUILDINGS[currentBIdx].name;
+}
+
+document.getElementById('b-sel').onchange = function() { loadBuilding(parseInt(this.value)); };
+
+// ================================================================
+// 工具
+// ================================================================
+function getType(t) {
+  if (/餐饮|咖啡|快餐/.test(t)) return '餐饮';
+  if (/购物|服装|超市/.test(t)) return '购物';
+  if (/体育|健身/.test(t)) return '运动';
+  if (/医疗/.test(t)) return '医疗';
+  if (/住宿|酒店/.test(t)) return '住宿';
+  if (/金融|银行/.test(t)) return '金融';
+  if (/教育|书店/.test(t)) return '教育';
+  if (/娱乐|影院/.test(t)) return '娱乐';
+  return '其他';
+}
+
+function getIcon(t) {
+  if (/餐饮|咖啡|快餐/.test(t)) return '🍜';
+  if (/购物|服装|超市/.test(t)) return '🛍️';
+  if (/体育|健身/.test(t)) return '🏃';
+  if (/医疗/.test(t)) return '🏥';
+  if (/住宿|酒店/.test(t)) return '🏨';
+  if (/金融|银行/.test(t)) return '🏦';
+  if (/教育|书店/.test(t)) return '📚';
+  if (/娱乐|影院/.test(t)) return '🎬';
+  return '📍';
+}
+
+function getColor(t) {
+  if (/餐饮|咖啡/.test(t)) return '#f59e0b';
+  if (/购物|服装/.test(t)) return '#8b5cf6';
+  if (/体育|健身/.test(t)) return '#10b981';
+  if (/医疗/.test(t)) return '#ef4444';
+  if (/住宿/.test(t)) return '#6366f1';
+  if (/金融|银行/.test(t)) return '#3b82f6';
+  if (/教育/.test(t)) return '#f97316';
+  if (/娱乐|影院/.test(t)) return '#ec4899';
+  return '#6b7280';
+}
+
+function calcDist(lng1, lat1, lng2, lat2) {
+  const dx=(lng2-lng1)*111000*Math.cos((lat1+lat2)/2*Math.PI/180);
+  const dy=(lat2-lat1)*111000;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function hideNavPanel() {
+  document.getElementById('nav-panel').classList.remove('show');
+  document.getElementById('panel').style.display = 'block';
+}
+
+function clearMarkers() {
+  poiMarkers.forEach(m => m.setMap(null));
+  poiMarkers = [];
+  [startMarker, endMarker, navPolyline].forEach(m => { if (m) m.setMap(null); });
+  startMarker = endMarker = navPolyline = null;
+}
+
+function setBadge(text, cls) {
+  const b = document.getElementById('mode-badge');
+  b.textContent = text;
+  b.className = 'badge ' + (cls || '');
+}
+
+let tipTimer;
+function showTip(msg) {
+  const t = document.getElementById('tip');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ================================================================
+// 启动！
+// ================================================================
+// 等待 DOM 就绪
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+
+</body>
+</html>

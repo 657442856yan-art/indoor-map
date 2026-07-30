@@ -1,0 +1,2945 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>室内地图 · 最终版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; background: linear-gradient(90deg, #00d4ff, #7b2cbf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { color: #888; font-size: 14px; }
+        
+        .main-layout { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+        
+        .sidebar {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            height: fit-content;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+        .sidebar h3 { font-size: 16px; margin-bottom: 15px; color: #00d4ff; }
+        
+        /* 搜索区域 */
+        .search-section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+        .search-input::placeholder { color: #888; }
+        .search-input:focus { border-color: #00d4ff; }
+        .search-btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .search-btn:hover { transform: scale(1.05); }
+        .search-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .search-tips {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.5;
+        }
+        
+        /* 搜索结果 */
+        .search-results {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result-item {
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+        .result-item:hover {
+            background: rgba(255,255,255,0.1);
+            border-left-color: #00d4ff;
+        }
+        .result-item h4 { font-size: 14px; margin-bottom: 4px; color: #fff; }
+        .result-item p { font-size: 12px; color: #888; }
+        .result-item .address { color: #aaa; margin-top: 4px; }
+        .result-item .has-indoor {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+            font-size: 11px;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+            font-size: 13px;
+        }
+        
+        /* 楼层选择器 */
+        .floor-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+        .floor-section h3 {
+            color: #00d4ff;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .floor-info {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+        }
+        .floor-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .floor-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+        .floor-item:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(0, 212, 255, 0.5);
+        }
+        .floor-item.active {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(123, 44, 191, 0.3));
+            border-color: #00d4ff;
+        }
+        .floor-name {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .floor-type {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            color: #aaa;
+        }
+        .floor-type.entertainment { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+        .floor-type.dining { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .floor-type.shopping { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .floor-type.parking { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+        
+        .floor-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #888;
+        }
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        /* 预设商场 */
+        .preset-section {
+            margin-top: 20px;
+        }
+        .section-title {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .building-list { display: flex; flex-direction: column; gap: 10px; }
+        .building-item {
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        .building-item:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); }
+        .building-item.active { border-color: #00d4ff; background: rgba(0,212,255,0.1); }
+        .building-item h4 { font-size: 14px; margin-bottom: 5px; }
+        .building-item p { font-size: 12px; color: #888; }
+        
+        .map-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            position: relative;
+        }
+        #map {
+            width: 100%;
+            height: 600px;
+            border-radius: 12px;
+            background: #f0f0f0;
+        }
+        
+        .status-bar {
+            margin-top: 15px;
+            padding: 12px 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-bar.success { border-left: 3px solid #4ade80; }
+        .status-bar.error { border-left: 3px solid #f87171; }
+        .status-bar.loading { border-left: 3px solid #fbbf24; }
+        
+        /* 地图上的楼层控制器 */
+        .map-floor-control {
+            position: absolute;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.85);
+            border-radius: 12px;
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .map-floor-control.visible { display: flex; }
+        .map-floor-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 50px;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid transparent;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .map-floor-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+        .map-floor-btn.active {
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            border-color: rgba(255,255,255,0.3);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+        }
+
+        /* 点击地图建筑进入 3D 的提示条 */
+        .map-hint {
+            position: absolute;
+            left: 18px;
+            bottom: 18px;
+            z-index: 30;
+            max-width: 360px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: rgba(11, 15, 30, 0.85);
+            border: 1px solid rgba(0, 212, 255, 0.35);
+            border-radius: 10px;
+            color: #dff;
+            font-size: 12.5px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+            animation: hintPulse 2.4s ease-in-out infinite;
+        }
+        .map-hint strong { color: #00d4ff; }
+        .map-hint-close {
+            margin-left: 2px;
+            background: transparent;
+            border: none;
+            color: #9ab;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 2px;
+        }
+        .map-hint-close:hover { color: #fff; }
+        .map-hint.hide { display: none; }
+        @keyframes hintPulse {
+            0%, 100% { border-color: rgba(0, 212, 255, 0.35); }
+            50% { border-color: rgba(0, 212, 255, 0.85); }
+        }
+
+        /* 预设商场可点击标记 */
+        .mall-marker {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: rgba(0, 212, 255, 0.18);
+            border: 2px solid #00d4ff;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.45);
+            cursor: pointer;
+        }
+        .mall-marker > span { transform: rotate(45deg); }
+
+        .demo-mode {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(251, 191, 36, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+        .demo-mode h4 { color: #fbbf24; font-size: 14px; margin-bottom: 10px; }
+        .demo-mode p { font-size: 12px; color: #ccc; line-height: 1.6; }
+        
+        /* 加载动画 */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* 建筑信息面板 */
+        .building-info {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(74, 222, 128, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid #4ade80;
+        }
+        .building-info h4 {
+            color: #4ade80;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .building-info p {
+            font-size: 12px;
+            color: #aaa;
+        }
+        
+        @media (max-width: 900px) {
+            .main-layout { grid-template-columns: 1fr; }
+            #map { height: 400px; }
+            .map-floor-control {
+                right: 10px;
+                top: auto;
+                bottom: 100px;
+                transform: none;
+                max-height: 200px;
+            }
+        }
+        /* ===== 顶部模式徽标 ===== */
+        .mode-badge-out {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            background: rgba(0, 212, 255, 0.12);
+            border: 1px solid rgba(0, 212, 255, 0.35);
+            font-size: 13px;
+            color: #00d4ff;
+        }
+
+        /* ===== 进入商场按钮 ===== */
+        .enter-mall-btn {
+            margin-top: 12px;
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #7b2cbf, #00d4ff);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .enter-mall-btn:hover { transform: scale(1.03); box-shadow: 0 4px 18px rgba(123, 44, 191, 0.5); }
+        .enter-mall-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* ===== 室内 3D 模式叠加层 ===== */
+        #indoorOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: radial-gradient(circle at 50% 38%, #16213e 0%, #0b0b18 100%);
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            overflow: hidden;
+        }
+        #indoorOverlay.active { display: block; }
+        #indoorOverlay.show { opacity: 1; }
+        #indoorCanvas { position: absolute; inset: 0; display: block; }
+
+        /* HUD 通用：容器不挡事件，子元素可交互 */
+        .hud { position: absolute; z-index: 10; color: #e6f6ff; pointer-events: none; }
+        .hud * { pointer-events: auto; }
+
+        /* 顶部栏 */
+        .hud-top {
+            top: 0; left: 0; right: 0; height: 58px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 18px;
+            background: linear-gradient(180deg, rgba(11, 11, 24, 0.92), rgba(11, 11, 24, 0));
+        }
+        .hud-top .mall-title { font-size: 18px; font-weight: 700; line-height: 1.2; }
+        .hud-top .mall-title small { display: block; font-size: 11px; color: #8ab; font-weight: 400; }
+        .hud-top .top-right { display: flex; align-items: center; gap: 12px; }
+        .mode-badge {
+            padding: 4px 12px; border-radius: 20px;
+            background: rgba(0, 212, 255, 0.15); border: 1px solid rgba(0, 212, 255, 0.4);
+            font-size: 13px;
+        }
+        .return-btn {
+            padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer;
+            background: linear-gradient(135deg, #ff5f6d, #ffc371); color: #fff;
+            font-weight: 600; font-size: 13px; transition: all 0.2s;
+        }
+        .return-btn:hover { transform: scale(1.05); }
+
+        /* 右侧楼层控制器 */
+        .hud-right {
+            right: 18px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 6px;
+            background: rgba(11, 11, 24, 0.55); backdrop-filter: blur(8px);
+            padding: 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+            max-height: 72vh; overflow-y: auto;
+        }
+        .hud-floor-btn {
+            min-width: 54px; padding: 10px 8px; border-radius: 8px; border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.08); color: #fff; cursor: pointer;
+            font-size: 13px; font-weight: 500; transition: all 0.2s;
+        }
+        .hud-floor-btn:hover { background: rgba(255, 255, 255, 0.18); }
+        .hud-floor-btn.active {
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 4px 14px rgba(0, 212, 255, 0.4);
+        }
+
+        /* 左侧店铺列表 */
+        .hud-left {
+            left: 18px; top: 74px; width: 232px; max-height: calc(100vh - 150px);
+            background: rgba(11, 11, 24, 0.6); backdrop-filter: blur(8px);
+            border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 12px; overflow-y: auto;
+        }
+        .hud-left h4 { font-size: 13px; color: #00d4ff; margin-bottom: 8px; }
+        .shop-list-item {
+            display: flex; align-items: center; gap: 8px; padding: 8px;
+            border-radius: 8px; cursor: pointer; font-size: 12px;
+            transition: all 0.2s; border: 1px solid transparent;
+        }
+        .shop-list-item:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(0, 212, 255, 0.4); }
+        .shop-list-item.active { background: rgba(0, 212, 255, 0.15); border-color: #00d4ff; }
+        .shop-cat-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+        /* 底部提示 + 选中详情 */
+        .hud-bottom {
+            left: 50%; bottom: 18px; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            width: min(680px, 92vw);
+        }
+        .hud-hint {
+            font-size: 12px; color: #9fb; background: rgba(11, 11, 24, 0.6);
+            padding: 6px 14px; border-radius: 20px; text-align: center;
+        }
+        .hud-detail {
+            width: 100%; background: rgba(11, 11, 24, 0.82); backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 12px;
+            padding: 12px 16px; display: none;
+        }
+        .hud-detail.show { display: block; }
+        .hud-detail h3 { font-size: 15px; margin-bottom: 4px; }
+        .hud-detail .cat-tag {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 11px; margin-right: 6px;
+        }
+        .hud-detail p { font-size: 12px; color: #aab; margin-top: 6px; }
+
+        /* 悬停浮层 */
+        .hud-tooltip {
+            position: absolute; z-index: 30; pointer-events: none;
+            background: rgba(11, 11, 24, 0.92); border: 1px solid rgba(0, 212, 255, 0.5);
+            border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #e6f6ff;
+            display: none; max-width: 230px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+        }
+        .hud-tooltip .t-name { font-weight: 700; font-size: 13px; }
+        .hud-tooltip .t-cat { margin-top: 3px; }
+
+        /* 3D 加载中 */
+        .indoor-loading {
+            position: absolute; inset: 0; display: flex; align-items: center;
+            justify-content: center; color: #00d4ff; font-size: 14px; gap: 10px; z-index: 5;
+        }
+
+        /* 室内模式：隐藏原界面 */
+        body.indoor-mode .sidebar,
+        body.indoor-mode .map-container,
+        body.indoor-mode .header { display: none; }
+
+        @media (max-width: 720px) {
+            .hud-left { width: 152px; top: 66px; padding: 8px; }
+            .hud-right { padding: 6px; }
+            .hud-floor-btn { min-width: 42px; padding: 8px 4px; font-size: 11px; }
+            .hud-bottom { width: 94vw; }
+            .hud-top .mall-title { font-size: 15px; }
+        }
+
+        /* 顶部 HUD 通用按钮（自定义 / 等） */
+        .hud-btn {
+            padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer;
+            background: rgba(0, 212, 255, 0.15); border: 1px solid rgba(0, 212, 255, 0.45);
+            color: #e6f6ff; font-size: 13px; font-weight: 600; transition: all 0.2s;
+        }
+        .hud-btn:hover { background: rgba(0, 212, 255, 0.3); transform: scale(1.04); }
+
+        /* 自定义建模面板（左侧抽屉） */
+        .hud-custom {
+            left: 0; top: 0; bottom: 0; width: 320px; max-width: 86vw;
+            background: rgba(9, 12, 26, 0.96); backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 16px 18px; overflow-y: auto; z-index: 40;
+            pointer-events: auto;
+            transform: translateX(-110%); transition: transform 0.35s ease;
+        }
+        .hud-custom.open { transform: translateX(0); }
+        .cp-head {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 15px; font-weight: 700; color: #00d4ff; margin-bottom: 14px;
+        }
+        .cp-close { background: none; border: none; color: #9ab; font-size: 18px; cursor: pointer; }
+        .cp-field { margin-bottom: 14px; }
+        .cp-field label { display: flex; justify-content: space-between; font-size: 12px; color: #cfe; margin-bottom: 6px; }
+        .cp-field label span { color: #00d4ff; font-weight: 600; }
+        .cp-field input[type="range"] { width: 100%; accent-color: #00d4ff; }
+        .cp-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #cfe; margin-bottom: 10px; cursor: pointer; }
+        .cp-check input { accent-color: #00d4ff; width: 16px; height: 16px; }
+        .cp-actions { display: flex; gap: 10px; margin-top: 8px; }
+        .cp-apply, .cp-reset {
+            flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600; transition: all 0.2s;
+        }
+        .cp-apply { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; }
+        .cp-reset { background: rgba(255, 255, 255, 0.1); color: #cfe; }
+        .cp-apply:hover, .cp-reset:hover { transform: scale(1.03); }
+        .cp-divider { height: 1px; background: rgba(0, 212, 255, 0.25); margin: 16px 0 10px; }
+        .cp-sub { font-size: 13px; color: #00d4ff; font-weight: 700; margin-bottom: 8px; }
+        .cp-draw, .cp-draw-ok, .cp-draw-cancel {
+            flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600; transition: all 0.2s;
+        }
+        .cp-draw { background: rgba(255, 209, 102, 0.18); color: #ffd166; border: 1px solid rgba(255, 209, 102, 0.5); }
+        .cp-draw-ok { background: linear-gradient(135deg, #00ff88, #00b894); color: #042; }
+        .cp-draw-cancel { background: rgba(255, 255, 255, 0.1); color: #cfe; }
+        .cp-draw:hover, .cp-draw-ok:hover, .cp-draw-cancel:hover { transform: scale(1.03); }
+        .cp-hint { font-size: 11px; color: #8ab; margin-top: 8px; line-height: 1.5; }
+        /* 编辑工具 */
+        .cp-floor { font-size: 11px; color: #9ab; font-weight: 400; margin-left: 6px; }
+        .cp-floor b { color: #00d4ff; }
+        .cp-edit-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .cp-edit-modes button {
+            padding: 9px 6px; border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 8px; cursor: pointer;
+            background: rgba(0, 212, 255, 0.08); color: #cfe; font-size: 12px; transition: all 0.2s;
+        }
+        .cp-edit-modes button:hover { background: rgba(0, 212, 255, 0.2); }
+        .cp-edit-modes button.active { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.4); box-shadow: 0 4px 15px rgba(0, 212, 255, 0.35); }
+        .cp-edit-sub { margin-top: 10px; animation: fadeIn 0.2s ease; }
+        .cp-sw-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+        .cp-sw-row .sw { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255, 255, 255, 0.3); transition: transform 0.15s; }
+        .cp-sw-row .sw:hover { transform: scale(1.15); }
+        .sw-fac { padding: 7px 10px; border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 8px; cursor: pointer; background: rgba(0, 212, 255, 0.08); color: #cfe; font-size: 12px; }
+        .sw-fac.active { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.4); }
+        .cp-mini { flex: 1; padding: 8px 4px; border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 8px; cursor: pointer; background: rgba(255, 255, 255, 0.06); color: #dfe; font-size: 12px; }
+        .cp-mini:hover { background: rgba(0, 212, 255, 0.18); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+        body.editing-mode .indoorCanvas, body.editing-mode #indoorCanvas { cursor: crosshair; }
+
+        /* 选中详情中的导航按钮与步骤 */
+        .hud-detail-actions { margin-top: 10px; }
+        .nav-btn {
+            padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer;
+            background: linear-gradient(135deg, #00d4ff, #00b894); color: #042; font-weight: 700; font-size: 13px;
+            transition: all 0.2s;
+        }
+        .nav-btn:hover { transform: scale(1.04); }
+        .hud-nav-steps {
+            margin-top: 10px; border-top: 1px dashed rgba(0, 212, 255, 0.3); padding-top: 10px;
+            font-size: 12px; color: #bcd;
+        }
+        .hud-nav-steps .ns-title { color: #00ff88; font-weight: 700; margin-bottom: 6px; }
+        .hud-nav-steps ol { margin: 0; padding-left: 18px; }
+        .hud-nav-steps li { margin-bottom: 5px; line-height: 1.45; }
+        .nav-stop {
+            margin-top: 10px; padding: 6px 14px; border: 1px solid rgba(255, 95, 109, 0.5);
+            background: rgba(255, 95, 109, 0.12); color: #ff8b95; border-radius: 8px; cursor: pointer; font-size: 12px;
+        }
+        .nav-stop:hover { background: rgba(255, 95, 109, 0.25); }
+
+        /* ===== 教程与引导增强（自定义建模易用性） ===== */
+        .hud-btn.tut-btn { background: linear-gradient(135deg, #7b2cbf, #00d4ff); color: #fff; border: 1px solid rgba(255, 255, 255, 0.45); }
+        .hud-btn.tut-btn:hover { box-shadow: 0 4px 16px rgba(123, 44, 191, 0.5); }
+        @keyframes tutPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(123, 44, 191, 0.55); }
+            50% { box-shadow: 0 0 0 9px rgba(123, 44, 191, 0); }
+        }
+        .tut-pulse { animation: tutPulse 1.1s ease-in-out 3; }
+
+        .tut-overlay {
+            position: fixed; inset: 0; z-index: 9999; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+            background: rgba(8, 10, 25, 0.8); backdrop-filter: blur(6px);
+        }
+        .tut-overlay.show { display: flex; animation: fadeIn 0.25s ease; }
+        .tut-box {
+            width: min(580px, 94vw); max-height: 86vh; overflow: auto;
+            background: linear-gradient(160deg, #1b2447, #141a33);
+            border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 18px;
+            padding: 26px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .tut-title {
+            font-size: 20px; font-weight: 800; margin-bottom: 12px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .tut-progress { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); margin: 12px 0; overflow: hidden; }
+        .tut-progress > i { display: block; height: 100%; width: 11%; background: linear-gradient(90deg, #00d4ff, #7b2cbf); transition: width 0.3s; }
+        .tut-step-n { font-size: 12px; color: #7fd; letter-spacing: 1px; }
+        .tut-step-body { margin: 12px 0 18px; color: #dde; font-size: 14px; line-height: 1.75; }
+        .tut-step-body b { color: #5fe; }
+        .tut-step-body code { background: rgba(0, 212, 255, 0.14); padding: 1px 6px; border-radius: 5px; color: #9ff; font-size: 13px; }
+        .tut-nav { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+        .tut-nav button { padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(0, 212, 255, 0.4); cursor: pointer; font-size: 13px; background: rgba(0, 212, 255, 0.1); color: #cfe; }
+        .tut-nav button.primary { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.4); }
+        .tut-nav button.tut-skip { margin-right: auto; background: none; border: none; color: #889; }
+
+        /* 快速开始清单 */
+        .qs-box { margin: 6px 0 12px; border: 1px solid rgba(0, 212, 255, 0.25); border-radius: 12px; background: rgba(0, 212, 255, 0.05); overflow: hidden; }
+        .qs-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer; font-size: 13px; color: #9ef; }
+        .qs-head .qs-tip { font-size: 11px; color: #7ab; }
+        .qs-list { list-style: none; padding: 6px 10px 10px; margin: 0; }
+        .qs-item { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #cde; transition: background 0.15s; }
+        .qs-item:hover { background: rgba(0, 212, 255, 0.12); }
+        .qs-check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(0, 212, 255, 0.5); flex: none; display: grid; place-items: center; font-size: 11px; color: #5fe; }
+        .qs-item.done .qs-check { background: #19c37d; border-color: #19c37d; color: #fff; }
+        .qs-item.done .qs-text { color: #8a9; text-decoration: line-through; }
+        .qs-badge { margin-left: auto; font-size: 11px; color: #7fd; }
+
+        /* 增强的编辑提示 */
+        .cp-hint.enh { background: rgba(0, 212, 255, 0.1); border-left: 3px solid #00d4ff; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; color: #bfe; line-height: 1.6; margin-top: 8px; }
+        .cp-hint.enh b { color: #5fe; }
+        .cp-hint.enh .next { display: block; margin-top: 6px; color: #9fd; font-size: 11.5px; }
+        .flash-ring { box-shadow: 0 0 0 3px #00d4ff !important; transition: box-shadow 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 室内地图导航系统</h1>
+            <p>基于高德地图 JS API 2.0 · 支持搜索、楼层切换和室内导航</p>
+            <span id="modeBadge" class="mode-badge-out">🌍 室外地图模式</span>
+        </div>
+        
+        <div class="main-layout">
+            <div class="sidebar">
+                <!-- 搜索区域 -->
+                <div class="search-section">
+                    <h3>🔍 搜索商场</h3>
+                    <div class="search-box">
+                        <input type="text" class="search-input" id="searchInput" placeholder="输入商场名称，如：国贸、大悦城..." />
+                        <button class="search-btn" id="searchBtn" onclick="searchBuildings()">搜索</button>
+                    </div>
+                    <div class="search-tips">
+                        💡 提示：搜索会自动查找有室内地图数据的商场
+                    </div>
+                    
+                    <!-- 搜索结果 -->
+                    <div class="search-results" id="searchResults" style="display: none;"></div>
+                </div>
+                
+                <!-- 当前建筑信息 -->
+                <div class="building-info" id="buildingInfo" style="display: none;">
+                    <h4 id="currentBuildingName">--</h4>
+                    <p id="currentBuildingAddr">--</p>
+                    <button class="enter-mall-btn" id="enterMallBtn" style="display:none;" onclick="enterMall()">🏪 进入商场 3D 漫游</button>
+                </div>
+                
+                <!-- 楼层选择器 -->
+                <div class="floor-section" id="floorSection" style="display: none;">
+                    <h3>🏢 楼层导航</h3>
+                    <div class="floor-info" id="floorInfo">
+                        点击楼层切换视图
+                    </div>
+                    <div class="floor-list" id="floorList">
+                        <!-- 动态生成楼层列表 -->
+                    </div>
+                    <div class="floor-legend">
+                        <div class="legend-item">
+                            <div class="legend-dot" style="background: #ec4899;"></div>
+                            <span>娱乐</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot" style="background: #f59e0b;"></div>
+                            <span>餐饮</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot" style="background: #3b82f6;"></div>
+                            <span>购物</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot" style="background: #9ca3af;"></div>
+                            <span>停车</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 预设商场 -->
+                <div class="preset-section">
+                    <div class="section-title">
+                        <span>📍</span>
+                        <span>快速选择（北京热门商场）</span>
+                    </div>
+                    <div class="building-list">
+                        <div class="building-item active" data-building="B000A856LJ" data-name="北京国贸中心" data-lng="116.4608" data-lat="39.9097">
+                            <h4>🏬 北京国贸中心</h4>
+                            <p>朝阳区建国路88号</p>
+                        </div>
+                        <div class="building-item" data-building="B000A7B1E8" data-name="北京朝阳大悦城" data-lng="116.5185" data-lat="39.9234">
+                            <h4>🏬 北京朝阳大悦城</h4>
+                            <p>朝阳区朝阳北路101号</p>
+                        </div>
+                        <div class="building-item" data-building="B000A8W2N3" data-name="北京三里屯太古里" data-lng="116.4551" data-lat="39.9362">
+                            <h4>🏬 北京三里屯太古里</h4>
+                            <p>朝阳区三里屯路19号</p>
+                        </div>
+                        <div class="building-item" data-building="B000A8Z2E5" data-name="北京西单大悦城" data-lng="116.3765" data-lat="39.9108">
+                            <h4>🏬 北京西单大悦城</h4>
+                            <p>西城区西单北大街131号</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-mode">
+                    <h4>ℹ️ 使用说明</h4>
+                    <p>• 直接<strong>点击地图上的商场标注</strong>即可进入 3D 漫游<br>• 或搜索/选择商场后点击「进入商场 3D 漫游」<br>• 在左侧或地图右侧切换楼层<br>• 不同颜色代表不同功能区</p>
+                </div>
+            </div>
+            
+            <div class="map-container">
+                <div id="map"></div>
+                
+                <!-- 地图上的楼层控制器 -->
+                <div class="map-floor-control" id="mapFloorControl">
+                    <!-- 动态生成 -->
+                </div>
+
+                <!-- 点击地图建筑进入 3D 的提示 -->
+                <div class="map-hint" id="mapHint">
+                    <span>🖱️ 点击地图上的<strong>商场标注</strong>即可读取高德数据并进入 3D 漫游</span>
+                    <button class="map-hint-close" id="mapHintClose" title="关闭提示">×</button>
+                </div>
+
+                <div id="status" class="status-bar loading">
+                    <span>⏳</span>
+                    <span>正在初始化地图...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 室内 3D 漫游叠加层 -->
+    <div id="indoorOverlay">
+        <div class="indoor-loading" id="indoorLoading"><span class="loading-spinner"></span> 正在构建 3D 商场模型…</div>
+        <!-- HUD：顶部栏 -->
+        <div class="hud hud-top">
+            <div class="mall-title" id="hudMallTitle">🏪 商场<small id="hudMallSub">室内 3D 模式</small></div>
+            <div class="top-right">
+                <span class="mode-badge">🏪 室内 3D 模式</span>
+                <button class="hud-btn tut-btn" onclick="openTutorial()">📖 教程</button>
+                <button class="hud-btn" id="customBtn" onclick="toggleCustomPanel()">⚙ 自定义</button>
+                <button class="return-btn" onclick="exitMall()">← 返回地图</button>
+            </div>
+        </div>
+        <!-- HUD：右侧楼层控制器 -->
+        <div class="hud hud-right" id="hudFloorCtrl"></div>
+        <!-- HUD：左侧店铺列表 -->
+        <div class="hud hud-left">
+            <h4>🛍️ 本层店铺</h4>
+            <div id="hudShopList"></div>
+        </div>
+        <!-- HUD：底部提示 + 选中详情 -->
+        <div class="hud hud-bottom">
+            <div class="hud-detail" id="hudDetail">
+                <h3 id="hudDetailName"></h3>
+                <div><span class="cat-tag" id="hudDetailCat"></span><span id="hudDetailFloor" style="font-size:11px;color:#9ab;"></span></div>
+                <p id="hudDetailDesc"></p>
+                <div class="hud-detail-actions">
+                    <button class="nav-btn" id="hudNavBtn">🧭 导航到这里</button>
+                </div>
+                <div class="hud-nav-steps" id="hudNavSteps" style="display:none;"></div>
+            </div>
+            <div class="hud-hint">🖱️ 拖拽旋转 · 滚轮缩放 · 悬停查看店铺 · 点击选中 · 右侧切换楼层</div>
+        </div>
+        <!-- 悬停浮层 -->
+        <div class="hud-tooltip" id="hudTooltip"></div>
+
+        <!-- 自定义 3D 建模面板 -->
+        <div class="hud hud-custom" id="customPanel">
+            <div class="cp-head">⚙ 3D 建模自定义 <button class="cp-close" onclick="toggleCustomPanel()">✕</button></div>
+            <div class="qs-box" id="qsBox">
+                <div class="qs-head" onclick="toggleQS()">
+                    <span>🚀 快速开始（5 步建模）</span>
+                    <span class="qs-tip" id="qsToggle">收起 ▾</span>
+                </div>
+                <ul class="qs-list" id="qsList">
+                    <li class="qs-item" onclick="qsGo('size')"><span class="qs-check">○</span><span class="qs-text">① 调整整体尺寸（宽/深/层高/网格）</span></li>
+                    <li class="qs-item" onclick="qsGo('wall')"><span class="qs-check">○</span><span class="qs-text">② 加内墙（点两点连一段）</span></li>
+                    <li class="qs-item" onclick="qsGo('shop')"><span class="qs-check">○</span><span class="qs-text">③ 编辑店铺（拖动/改色/增删）</span></li>
+                    <li class="qs-item" onclick="qsGo('fac')"><span class="qs-check">○</span><span class="qs-text">④ 放置设施（电梯/扶梯…）</span></li>
+                    <li class="qs-item" onclick="qsGo('foot')"><span class="qs-check">○</span><span class="qs-text">⑤ 自由绘制建筑轮廓</span></li>
+                </ul>
+            </div>
+            <div class="cp-field">
+                <label>建筑宽度 W <span id="valW">140</span></label>
+                <input type="range" id="cfgW" min="60" max="220" step="5" value="140">
+            </div>
+            <div class="cp-field">
+                <label>建筑深度 D <span id="valD">100</span></label>
+                <input type="range" id="cfgD" min="60" max="180" step="5" value="100">
+            </div>
+            <div class="cp-field">
+                <label>楼层高度 <span id="valFH">20</span></label>
+                <input type="range" id="cfgFH" min="12" max="32" step="1" value="20">
+            </div>
+            <div class="cp-field">
+                <label>店铺列数 <span id="valCOLS">8</span></label>
+                <input type="range" id="cfgCOLS" min="4" max="12" step="1" value="8">
+            </div>
+            <div class="cp-field">
+                <label>店铺行数 <span id="valROWS">6</span></label>
+                <input type="range" id="cfgROWS" min="3" max="10" step="1" value="6">
+            </div>
+            <label class="cp-check"><input type="checkbox" id="cfgAtrium" checked> 中庭广场（中央留空）</label>
+            <label class="cp-check"><input type="checkbox" id="cfgLabels" checked> 显示店铺文字标签</label>
+            <label class="cp-check"><input type="checkbox" id="cfgRotate"> 自动旋转视角</label>
+            <div class="cp-actions">
+                <button class="cp-apply" onclick="applyCustomConfig()">应用并重建</button>
+                <button class="cp-reset" onclick="resetCustomConfig()">重置默认</button>
+            </div>
+            <div class="cp-divider"></div>
+            <div class="cp-sub">编辑工具 <span class="cp-floor">当前层：<b id="cpEditFloor">F1</b></span></div>
+            <div class="cp-edit-modes" id="editModeRow">
+                <button data-mode="wall" onclick="setEditMode('wall')">🧱 加内墙</button>
+                <button data-mode="shop" onclick="setEditMode('shop')">🏬 编辑店铺</button>
+                <button data-mode="facility" onclick="setEditMode('facility')">🛗 放设施</button>
+                <button data-mode="" class="active" onclick="setEditMode('')">👁 浏览</button>
+            </div>
+            <div class="cp-edit-sub" id="editShopTools" style="display:none">
+                <div class="cp-sw-row">
+                    <span class="sw" style="background:#3b82f6" onclick="recolorSelectedShop('shopping')" title="购物"></span>
+                    <span class="sw" style="background:#f59e0b" onclick="recolorSelectedShop('dining')" title="餐饮"></span>
+                    <span class="sw" style="background:#4ade80" onclick="recolorSelectedShop('entertainment')" title="娱乐"></span>
+                    <span class="sw" style="background:#9ca3af" onclick="recolorSelectedShop('parking')" title="停车"></span>
+                </div>
+                <div class="cp-actions">
+                    <button class="cp-mini" onclick="addShopHere()">➕ 新增</button>
+                    <button class="cp-mini" onclick="deleteSelectedShop()">🗑 删除</button>
+                    <button class="cp-mini" onclick="undoSelectedShop()">↩ 复位</button>
+                </div>
+            </div>
+            <div class="cp-edit-sub" id="editWallTools" style="display:none">
+                <div class="cp-actions">
+                    <button class="cp-mini" onclick="undoLastWall()">↩ 撤销一段</button>
+                    <button class="cp-mini" onclick="clearFloorWalls()">🗑 清空本层</button>
+                </div>
+            </div>
+            <div class="cp-edit-sub" id="editFacilityTools" style="display:none">
+                <div class="cp-sw-row">
+                    <button class="sw-fac active" data-fac="elevator" onclick="setFacilityType('elevator')">🛗 电梯</button>
+                    <button class="sw-fac" data-fac="escalator" onclick="setFacilityType('escalator')">⬆ 扶梯</button>
+                    <button class="sw-fac" data-fac="stairs" onclick="setFacilityType('stairs')">🪜 楼梯</button>
+                    <button class="sw-fac" data-fac="fountain" onclick="setFacilityType('fountain')">⛲ 喷泉</button>
+                </div>
+            </div>
+            <div class="cp-hint" id="editHint"></div>
+            <div class="cp-divider"></div>
+            <div class="cp-sub">自由绘制建筑轮廓（墙体）</div>
+            <div class="cp-actions">
+                <button class="cp-draw" onclick="startDrawFootprint()">✏️ 整栋轮廓</button>
+                <button class="cp-draw" onclick="startDrawFloorFootprint()">✏️ 本层轮廓</button>
+                <button class="cp-draw-ok" onclick="finishDrawFootprint()">✅ 完成轮廓</button>
+            </div>
+            <div class="cp-actions">
+                <button class="cp-draw-cancel" onclick="cancelDrawFootprint()">↺ 取消</button>
+                <button class="cp-draw-cancel" onclick="resetFootprintRect()">整栋矩形</button>
+                <button class="cp-draw-cancel" onclick="resetFloorFootprintRect()">本层矩形</button>
+            </div>
+            <div class="cp-hint" id="cpFootprintHint">在 3D 场景中点击地面落点，连成闭合多边形即改变建筑外形；店铺按轮廓内裁剪。</div>
+        </div>
+    </div>
+
+    <!-- 安全密钥配置 -->
+    <script>
+        window._AMapSecurityConfig = {
+            securityJsCode: 'YOUR_AMAP_SECURITY_CODE'
+        };
+    </script>
+    
+    <!-- 高德地图 JS API 2.0 - 预加载所有插件 -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_KEY_HERE&plugin=AMap.IndoorMap,AMap.PlaceSearch,AMap.MoveAnimation"></script>
+
+    <!-- Three.js（3D 室内建模 / 漫游） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+    
+    <script>
+        let map = null;
+        let indoorMap = null;
+        let currentBuilding = null;
+        let currentBuildingInfo = null;
+        let placeSearch = null;
+        let floorData = []; // 当前建筑的楼层数据
+        let currentFloor = null; // 当前显示的楼层
+
+        // 地图点击进入 3D 漫游相关状态
+        let _lastMarkerClickTs = 0;        // 抑制「标记点击」误触发的 map click
+        let presetMarkers = [];            // 预设商场标记 [{id, marker}]
+        let currentMarker = null;          // 当前选中建筑的标记
+
+        /* =========================================================
+         * GeoHUB 自定义地图样式
+         * 将下方填入你的 GeoHUB 样式 ID（需与地图 Key 同属一个开发者账号，
+         * 并在高德控制台 GeoHUB 中创建并发布）。留空则自动 fallback 到内置暗色主题。
+         * ========================================================= */
+        const GEOHUB_STYLE_ID = '';   // ← 填入 GeoHUB 样式 ID，例如 'xxxxxxxx'（未配置则使用标准地图模板）
+        
+        // 模拟楼层数据（当API无法获取时）
+        const mockFloorData = {
+            'B000A856LJ': [ // 国贸中心
+                { name: 'L1', display: '1层', type: 'shopping', desc: '奢侈品、化妆品' },
+                { name: 'L2', display: '2层', type: 'shopping', desc: '时尚服饰' },
+                { name: 'L3', display: '3层', type: 'shopping', desc: '运动户外' },
+                { name: 'L4', display: '4层', type: 'dining', desc: '美食广场' },
+                { name: 'B1', display: 'B1层', type: 'shopping', desc: '超市、轻食' },
+                { name: 'B2', display: 'B2层', type: 'parking', desc: '停车场' },
+                { name: 'B3', display: 'B3层', type: 'parking', desc: '停车场' }
+            ],
+            'B000A7B1E8': [ // 朝阳大悦城
+                { name: 'L1', display: '1层', type: 'shopping', desc: '旗舰店、美妆' },
+                { name: 'L2', display: '2层', type: 'shopping', desc: '少淑女装' },
+                { name: 'L3', display: '3层', type: 'shopping', desc: '潮流服饰' },
+                { name: 'L4', display: '4层', type: 'entertainment', desc: '电玩、影院' },
+                { name: 'L5', display: '5层', type: 'dining', desc: '主题餐厅' },
+                { name: 'L6', display: '6层', type: 'dining', desc: '美食天地' },
+                { name: 'L7', display: '7层', type: 'entertainment', desc: 'KTV、娱乐' },
+                { name: 'B1', display: 'B1层', type: 'shopping', desc: '快时尚' }
+            ],
+            'B000A8W2N3': [ // 三里屯太古里
+                { name: 'L1', display: '1层', type: 'shopping', desc: '国际大牌' },
+                { name: 'L2', display: '2层', type: 'shopping', desc: '设计师品牌' },
+                { name: 'L3', display: '3层', type: 'dining', desc: '特色餐饮' },
+                { name: 'L4', display: '4层', type: 'entertainment', desc: '酒吧、夜店' }
+            ],
+            'B000A8Z2E5': [ // 西单大悦城
+                { name: 'L1', display: '1层', type: 'shopping', desc: '黄金珠宝' },
+                { name: 'L2', display: '2层', type: 'shopping', desc: '女装' },
+                { name: 'L3', display: '3层', type: 'shopping', desc: '男装' },
+                { name: 'L4', display: '4层', type: 'shopping', desc: '运动休闲' },
+                { name: 'L5', display: '5层', type: 'dining', desc: '美食' },
+                { name: 'L6', display: '6层', type: 'entertainment', desc: '影院' },
+                { name: 'B1', display: 'B1层', type: 'shopping', desc: '数码电器' },
+                { name: 'B2', display: 'B2层', type: 'parking', desc: '停车场' },
+                { name: 'B3', display: 'B3层', type: 'parking', desc: '停车场' }
+            ]
+        };
+        
+        // 更新状态栏
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            const icons = { loading: '⏳', success: '✅', error: '❌' };
+            statusEl.className = `status-bar ${type}`;
+            statusEl.innerHTML = `<span>${icons[type]}</span><span>${message}</span>`;
+        }
+
+        // 全局错误浮层：把静默失败的异常显示出来，便于定位
+        function showErr(msg) {
+            let t = document.getElementById('errToast');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'errToast';
+                t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:82%;background:rgba(220,38,38,.96);color:#fff;padding:10px 16px;border-radius:8px;font:13px/1.5 system-ui;z-index:10000;box-shadow:0 6px 24px rgba(0,0,0,.45);display:none;';
+                document.body.appendChild(t);
+            }
+            t.textContent = '⚠️ ' + msg;
+            t.style.display = 'block';
+            clearTimeout(t._timer);
+            t._timer = setTimeout(function () { t.style.display = 'none'; }, 7000);
+        }
+        window.addEventListener('error', function (ev) {
+            showErr('脚本错误: ' + (ev.message || '未知') + (ev.lineno ? (' @行' + ev.lineno) : ''));
+        });
+
+        // 初始化地图
+        function initMap() {
+            updateStatus('正在创建地图实例...', 'loading');
+            
+            try {
+                if (typeof AMap === 'undefined') {
+                    updateStatus('错误：AMap 对象未加载，请检查网络', 'error');
+                    return;
+                }
+                
+                map = new AMap.Map('map', {
+                    zoom: 18,
+                    center: [116.4608, 39.9097],
+                    viewMode: '3D',
+                    pitch: 50,
+                    showIndoorMap: true
+                });
+
+                // 应用 GeoHUB 自定义地图样式（未配置则使用标准地图模板）
+                try {
+                    map.setMapStyle(GEOHUB_STYLE_ID ? ('amap://styles/' + GEOHUB_STYLE_ID) : 'amap://styles/normal');
+                } catch (e) {
+                    console.warn('设置地图样式失败，使用默认样式：', e);
+                }
+
+                updateStatus('地图创建成功，正在加载室内地图插件...', 'loading');
+                
+                initPlaceSearch();
+                addIndoorMapLayer();
+
+                // 点击地图上的建筑（POI）→ 读取高德数据 → 进入 3D 漫游
+                map.on('click', handleMapClick);
+                addPresetMarkers();
+
+                // 关闭提示条
+                const hintClose = document.getElementById('mapHintClose');
+                if (hintClose) hintClose.addEventListener('click', function () {
+                    const h = document.getElementById('mapHint');
+                    if (h) h.classList.add('hide');
+                });
+                
+            } catch (error) {
+                updateStatus('地图初始化失败: ' + error.message, 'error');
+                console.error('地图初始化错误:', error);
+            }
+        }
+        
+        // 初始化 PlaceSearch
+        function initPlaceSearch() {
+            try {
+                if (typeof AMap.PlaceSearch === 'undefined') {
+                    console.warn('PlaceSearch 插件不可用');
+                    return;
+                }
+                
+                placeSearch = new AMap.PlaceSearch({
+                    pageSize: 10,
+                    pageIndex: 1,
+                    extensions: 'all'
+                });
+                
+            } catch (error) {
+                console.error('PlaceSearch 初始化失败:', error);
+            }
+        }
+        
+        // 搜索商场
+        function searchBuildings() {
+            const keyword = document.getElementById('searchInput').value.trim();
+            const resultsContainer = document.getElementById('searchResults');
+            const searchBtn = document.getElementById('searchBtn');
+            
+            if (!keyword) {
+                updateStatus('请输入搜索关键词', 'error');
+                return;
+            }
+            
+            if (!placeSearch) {
+                updateStatus('搜索功能未初始化，请刷新页面重试', 'error');
+                return;
+            }
+            
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<span class="loading-spinner"></span>';
+            resultsContainer.style.display = 'block';
+            resultsContainer.innerHTML = '<div class="no-results"><span class="loading-spinner"></span> 正在搜索...</div>';
+            updateStatus(`正在搜索 "${keyword}"...`, 'loading');
+            
+            placeSearch.search(keyword, function(status, result) {
+                searchBtn.disabled = false;
+                searchBtn.textContent = '搜索';
+                
+                if (status === 'complete' && result.info === 'OK') {
+                    displaySearchResults(result.poiList.pois);
+                } else if (status === 'no_data') {
+                    resultsContainer.innerHTML = '<div class="no-results">😔 未找到相关商场<br>建议尝试其他关键词，如：商场、购物中心、百货</div>';
+                    updateStatus('搜索完成，未找到结果', 'error');
+                } else {
+                    resultsContainer.innerHTML = '<div class="no-results">❌ 搜索失败，请稍后重试</div>';
+                    updateStatus('搜索失败: ' + status, 'error');
+                }
+            });
+        }
+        
+        // 显示搜索结果
+        function displaySearchResults(pois) {
+            const resultsContainer = document.getElementById('searchResults');
+            
+            if (!pois || pois.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">😔 未找到相关商场</div>';
+                updateStatus('搜索完成，未找到结果', 'error');
+                return;
+            }
+            
+            const indoorKeywords = ['商场', '购物中心', '百货', 'mall', 'shopping', '中心', '城', '广场'];
+            const filteredPois = pois.filter(poi => {
+                const name = (poi.name || '').toLowerCase();
+                const type = (poi.type || '').toLowerCase();
+                return indoorKeywords.some(kw => name.includes(kw) || type.includes(kw));
+            });
+            
+            const displayPois = filteredPois.length > 0 ? filteredPois : pois;
+            
+            let html = '';
+            displayPois.forEach(poi => {
+                const name = poi.name || '未知';
+                const address = poi.address || '地址未知';
+                const type = poi.type || '';
+                const hasIndoor = poi.indoor_map ? true : false;
+                const lng = poi.location ? poi.location.lng : null;
+                const lat = poi.location ? poi.location.lat : null;
+                const poiId = poi.id || '';
+                
+                html += `
+                    <div class="result-item" 
+                         data-name="${name}" 
+                         data-lng="${lng}" 
+                         data-lat="${lat}"
+                         data-poiid="${poiId}"
+                         data-address="${address}"
+                         onclick="selectSearchResult(this)">
+                        <h4>${name}</h4>
+                        <p class="address">📍 ${address}</p>
+                        <p style="font-size: 11px; color: #666; margin-top: 4px;">${type}</p>
+                        ${hasIndoor ? '<span class="has-indoor">✓ 有室内地图数据</span>' : ''}
+                    </div>
+                `;
+            });
+            
+            resultsContainer.innerHTML = html;
+            updateStatus(`找到 ${displayPois.length} 个相关地点`, 'success');
+        }
+        
+        // 选择搜索结果
+        function selectSearchResult(element) {
+            const name = element.dataset.name;
+            const lng = parseFloat(element.dataset.lng);
+            const lat = parseFloat(element.dataset.lat);
+            const poiId = element.dataset.poiid;
+            const address = element.dataset.address;
+            
+            if (!lng || !lat) {
+                updateStatus('该地点坐标信息不完整', 'error');
+                return;
+            }
+            
+            document.querySelectorAll('.result-item').forEach(item => {
+                item.style.background = 'rgba(255,255,255,0.05)';
+                item.style.borderLeftColor = 'transparent';
+            });
+            element.style.background = 'rgba(0,212,255,0.2)';
+            element.style.borderLeftColor = '#00d4ff';
+            
+            document.querySelectorAll('.building-item').forEach(item => item.classList.remove('active'));
+            
+            currentBuilding = poiId;
+            currentBuildingInfo = { name, address, poiId };
+            
+            updateBuildingInfo(name, address);
+            loadBuildingData(poiId, name, lng, lat);
+        }
+        
+        // 更新建筑信息面板
+        function updateBuildingInfo(name, address) {
+            document.getElementById('currentBuildingName').textContent = name;
+            document.getElementById('currentBuildingAddr').textContent = address || '地址未知';
+            document.getElementById('buildingInfo').style.display = 'block';
+            document.getElementById('enterMallBtn').style.display = 'block';
+        }
+        
+        // 加载建筑数据（包括楼层）
+        function loadBuildingData(buildingId, name, lng, lat) {
+            updateStatus(`正在加载 ${name}...`, 'loading');
+            
+            try {
+                map.setZoomAndCenter(18, [lng, lat]);
+                
+                if (indoorMap && indoorMap.showIndoorMap) {
+                    indoorMap.showIndoorMap(buildingId);
+                }
+                
+                addMarker(lng, lat, name);
+                
+                // 加载楼层数据
+                loadFloorData(buildingId);
+
+                // 尝试拉取高德真实室内店铺 POI（异步，成功则覆盖楼层/店铺数据）
+                extractIndoorShops(buildingId, lng, lat);
+
+                updateStatus(`${name} 加载完成`, 'success');
+                
+            } catch (error) {
+                updateStatus(`加载失败: ${error.message}`, 'error');
+                console.error('建筑加载错误:', error);
+            }
+        }
+
+        /* =========================================================
+         * 点击地图上的建筑 → 读取高德数据 → 进入 3D 漫游
+         * ========================================================= */
+
+        // 统一从地图点击/标记进入某个商场（读取高德 POI 数据）
+        function enterBuildingFromMap(info) {
+            if (!info || !info.poiId) {
+                updateStatus('无法识别该建筑的 POI 信息', 'error');
+                return;
+            }
+            if (typeof info.lng !== 'number' || typeof info.lat !== 'number') {
+                updateStatus('该建筑坐标信息缺失，无法定位', 'error');
+                return;
+            }
+            currentBuilding = info.poiId;
+            currentBuildingInfo = { name: info.name, address: info.address || '', poiId: info.poiId };
+
+            // 同步侧边栏高亮
+            document.querySelectorAll('.building-item').forEach(function (it) {
+                it.classList.toggle('active', it.dataset.building === info.poiId);
+            });
+
+            updateBuildingInfo(info.name, info.address || '');
+            loadBuildingData(info.poiId, info.name, info.lng, info.lat);
+
+            updateStatus('正在读取「' + info.name + '」的高德室内数据，进入 3D 漫游…', 'loading');
+            // 稍作等待，让真实室内店铺 POI 有机会异步拉取后再构建场景
+            setTimeout(function () {
+                if (!indoor.active) enterMall();
+            }, 600);
+        }
+
+        // 地图点击分发：优先用 POI 直连，否则周边检索回退
+        function handleMapClick(e) {
+            if (indoor.active) return;                       // 已在 3D 内
+            if (Date.now() - _lastMarkerClickTs < 400) return; // 抑制标记点击连带触发
+            if (e.poi && e.poi.id) {
+                handlePoiClick(e.poi);
+            } else if (e.lnglat) {
+                handleMapEmptyClick(e.lnglat);
+            }
+        }
+
+        // 从 LngLat / 数组 / 对象 中安全取出 [lng, lat]
+        function getLngLat(obj) {
+            if (!obj) return null;
+            if (typeof obj.lng === 'number' && typeof obj.lat === 'number') return [obj.lng, obj.lat];
+            if (Array.isArray(obj) && obj.length >= 2) return [obj[0], obj[1]];
+            if (typeof obj.getLngLat === 'function') {
+                const l = obj.getLngLat();
+                return [l.lng, l.lat];
+            }
+            return null;
+        }
+
+        // 点击地图 POI 标注（e.poi 存在）
+        function handlePoiClick(poi) {
+            const ll = getLngLat(poi.location);
+            enterBuildingFromMap({
+                name: poi.name || '未知建筑',
+                poiId: poi.id,
+                lng: ll ? ll[0] : null,
+                lat: ll ? ll[1] : null,
+                address: poi.address || (poi.pname && poi.cityname ? (poi.pname + poi.cityname + (poi.adname || '')) : '')
+            });
+        }
+
+        // 点击地图空白处：周边检索最近的商场/商业体
+        function handleMapEmptyClick(lnglat) {
+            const ll = getLngLat(lnglat);
+            if (!ll) return;
+            if (!placeSearch) {
+                updateStatus('请点击地图上的商场标注或左侧预设商场', 'error');
+                return;
+            }
+            updateStatus('正在识别该位置的商场…', 'loading');
+            placeSearch.searchNearBy('商场', ll, 300, function (status, result) {
+                if (status === 'complete' && result.info === 'OK' && result.poiList && result.poiList.pois.length) {
+                    const indoorWords = ['商场', '购物中心', '百货', 'shopping', 'mall', '广场', '中心'];
+                    const hit = result.poiList.pois.find(function (p) {
+                        const n = (p.name || '').toLowerCase();
+                        const t = (p.type || '').toLowerCase();
+                        return indoorWords.some(function (k) { return n.indexOf(k) >= 0 || t.indexOf(k) >= 0; });
+                    }) || result.poiList.pois[0];
+                    const hll = getLngLat(hit.location);
+                    enterBuildingFromMap({
+                        name: hit.name,
+                        poiId: hit.id,
+                        lng: hll ? hll[0] : ll[0],
+                        lat: hll ? hll[1] : ll[1],
+                        address: hit.address || ''
+                    });
+                } else {
+                    updateStatus('该位置未识别到商场，请点击地图上的商场标注或左侧预设商场', 'error');
+                }
+            });
+        }
+
+        // 在地图上放置 4 个预设商场的可点击标记
+        function addPresetMarkers() {
+            if (!map) return;
+            document.querySelectorAll('.building-item').forEach(function (item) {
+                const id = item.dataset.building;
+                const name = item.dataset.name;
+                const lng = parseFloat(item.dataset.lng);
+                const lat = parseFloat(item.dataset.lat);
+                const addr = item.querySelector('p') ? item.querySelector('p').textContent : '';
+                if (!id || isNaN(lng) || isNaN(lat)) return;
+                const marker = new AMap.Marker({
+                    position: [lng, lat],
+                    title: name,
+                    content: '<div class="mall-marker"><span>🏬</span></div>',
+                    anchor: 'bottom-center',
+                    zIndex: 100
+                });
+                marker.on('click', function () {
+                    _lastMarkerClickTs = Date.now();
+                    enterBuildingFromMap({ name: name, poiId: id, lng: lng, lat: lat, address: addr });
+                });
+                marker.setMap(map);
+                presetMarkers.push({ id: id, marker: marker });
+            });
+        }
+        
+        // 加载楼层数据
+        function loadFloorData(buildingId) {
+            // 优先使用模拟数据，如果没有则生成默认数据
+            floorData = mockFloorData[buildingId] || generateDefaultFloors();
+            
+            renderFloorList();
+            renderMapFloorControl();
+            
+            // 显示楼层区域
+            document.getElementById('floorSection').style.display = 'block';
+            document.getElementById('mapFloorControl').classList.add('visible');
+            
+            // 默认选中第一层
+            if (floorData.length > 0) {
+                switchFloor(floorData[0].name);
+            }
+        }
+        
+        // 生成默认楼层数据
+        function generateDefaultFloors() {
+            return [
+                { name: 'L1', display: '1层', type: 'shopping', desc: '主入口、服务台' },
+                { name: 'L2', display: '2层', type: 'shopping', desc: '时尚购物' },
+                { name: 'L3', display: '3层', type: 'shopping', desc: '品牌专区' },
+                { name: 'L4', display: '4层', type: 'dining', desc: '餐饮美食' },
+                { name: 'B1', display: 'B1层', type: 'shopping', desc: '生活配套' }
+            ];
+        }
+        
+        // 渲染楼层列表（侧边栏）
+        function renderFloorList() {
+            const floorList = document.getElementById('floorList');
+            const floorInfo = document.getElementById('floorInfo');
+            
+            floorInfo.textContent = `共 ${floorData.length} 层，点击切换楼层视图`;
+            
+            let html = '';
+            floorData.forEach(floor => {
+                const typeClass = floor.type || 'shopping';
+                const typeText = getFloorTypeText(floor.type);
+                
+                html += `
+                    <div class="floor-item" data-floor="${floor.name}" onclick="switchFloor('${floor.name}')">
+                        <span class="floor-name">${floor.display}</span>
+                        <span class="floor-type ${typeClass}">${typeText}</span>
+                    </div>
+                `;
+            });
+            
+            floorList.innerHTML = html;
+        }
+        
+        // 渲染地图楼层控制器
+        function renderMapFloorControl() {
+            const control = document.getElementById('mapFloorControl');
+            
+            let html = '';
+            // 倒序显示，高层在上
+            [...floorData].reverse().forEach(floor => {
+                html += `
+                    <button class="map-floor-btn" data-floor="${floor.name}" onclick="switchFloor('${floor.name}')">
+                        ${floor.display}
+                    </button>
+                `;
+            });
+            
+            control.innerHTML = html;
+        }
+        
+        // 获取楼层类型文本
+        function getFloorTypeText(type) {
+            const typeMap = {
+                'shopping': '购物',
+                'dining': '餐饮',
+                'entertainment': '娱乐',
+                'parking': '停车',
+                'office': '办公',
+                'service': '服务'
+            };
+            return typeMap[type] || '其他';
+        }
+        
+        // 切换楼层
+        function switchFloor(floorName) {
+            currentFloor = floorName;
+            
+            // 更新侧边栏选中状态
+            document.querySelectorAll('.floor-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.floor === floorName) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // 更新地图控制器选中状态
+            document.querySelectorAll('.map-floor-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.floor === floorName) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // 获取楼层信息
+            const floor = floorData.find(f => f.name === floorName);
+            if (floor) {
+                document.getElementById('floorInfo').innerHTML = `
+                    <strong>${floor.display}</strong> - ${floor.desc}
+                `;
+            }
+            
+            // 调用室内地图API切换楼层
+            if (indoorMap && indoorMap.showFloor) {
+                indoorMap.showFloor(floorName);
+            }
+            
+            console.log('切换到楼层:', floorName);
+        }
+
+        // ===== 高德真实室内店铺 POI 提取 =====
+        // 将高德 POI 品类字符串映射到 4 大类
+        function mapPoiCategory(typeStr) {
+            const t = (typeStr || '').toLowerCase();
+            if (t.indexOf('餐饮') >= 0 || t.indexOf('food') >= 0 || t.indexOf('dining') >= 0 || t.indexOf('咖啡') >= 0 || t.indexOf('茶') >= 0) return 'dining';
+            if (t.indexOf('娱乐') >= 0 || t.indexOf('休闲') >= 0 || t.indexOf('游乐') >= 0 || t.indexOf('健身') >= 0 || t.indexOf('影') >= 0 || t.indexOf('ktv') >= 0) return 'entertainment';
+            if (t.indexOf('停车') >= 0 || t.indexOf('park') >= 0) return 'parking';
+            return 'shopping';
+        }
+        // 楼层排序键：B1/B2 为负，L1/F1 为正
+        function floorSortKey(name) {
+            const m = String(name || '').match(/-?\d+/);
+            let n = m ? parseInt(m[0], 10) : 0;
+            if (/b/i.test(String(name || ''))) n = -Math.abs(n);
+            return n;
+        }
+        function prettyFloor(name) {
+            const m = String(name || '').match(/-?\d+/);
+            const n = m ? parseInt(m[0], 10) : 0;
+            return (/b/i.test(String(name || '')) ? 'B' + Math.abs(n) : n) + '层';
+        }
+        function dominantCat(list) {
+            const c = {};
+            list.forEach(s => { c[s.cat] = (c[s.cat] || 0) + 1; });
+            let best = 'shopping', bn = -1;
+            for (const k in c) { if (c[k] > bn) { bn = c[k]; best = k; } }
+            return best;
+        }
+        // 提取指定商场的真实室内 POI；失败/无数据则回退到生成式店铺
+        function extractIndoorShops(buildingId, lng, lat) {
+            realIndoorShops = { available: false, byFloor: {}, floors: [] };
+            try {
+                if (!indoorMap || !indoorMap.showIndoorMap) return;
+                indoorMap.showIndoorMap(buildingId);
+                let tries = 0;
+                const tryGet = () => {
+                    let building = null;
+                    try { building = indoorMap.getBuilding ? indoorMap.getBuilding() : null; } catch (e) {}
+                    if (!building && indoorMap.building) building = indoorMap.building;
+                    if (!building) {
+                        if (tries++ < 12) { setTimeout(tryGet, 300); return; }
+                        updateStatus('该商场暂无高德室内 POI，使用生成式店铺', 'error');
+                        return;
+                    }
+                    let pois = building.pois;
+                    if ((!pois || !pois.length) && building.searchPoi) {
+                        try { pois = building.searchPoi(''); } catch (e2) {}
+                    }
+                    if (!pois || !pois.length) {
+                        updateStatus('该商场暂无室内店铺 POI，使用生成式店铺', 'error');
+                        return;
+                    }
+                    const byFloor = {};
+                    pois.forEach(p => {
+                        const fl = (p.floor || p.level || '');
+                        const cat = mapPoiCategory(p.type);
+                        (byFloor[fl] = byFloor[fl] || []).push({ name: p.name, cat, floor: fl });
+                    });
+                    const floorKeys = Object.keys(byFloor).sort((a, b) => floorSortKey(a) - floorSortKey(b));
+                    if (!floorKeys.length) {
+                        updateStatus('该商场室内 POI 缺少楼层信息，使用生成式店铺', 'error');
+                        return;
+                    }
+                    realIndoorShops.byFloor = byFloor;
+                    realIndoorShops.floors = floorKeys.map(k => ({
+                        name: k, display: prettyFloor(k), type: dominantCat(byFloor[k]), desc: '高德室内楼层'
+                    }));
+                    realIndoorShops.available = true;
+                    // 用真实楼层覆盖 floorData 并刷新 UI
+                    floorData = realIndoorShops.floors;
+                    renderFloorList();
+                    renderMapFloorControl();
+                    if (floorData.length) switchFloor(floorData[0].name);
+                    updateStatus('已加载高德真实店铺 ' + pois.length + ' 家（' + floorKeys.length + ' 层）', 'success');
+                };
+                setTimeout(tryGet, 400);
+            } catch (e) {
+                console.error('extractIndoorShops error', e);
+            }
+        }
+
+        // 添加室内地图图层
+        function addIndoorMapLayer() {
+            try {
+                if (typeof AMap.IndoorMap === 'undefined') {
+                    updateStatus('警告：IndoorMap 插件不可用，显示普通地图', 'error');
+                    return;
+                }
+                
+                indoorMap = new AMap.IndoorMap({
+                    zIndex: 100,
+                    opacity: 1,
+                    cursor: 'pointer',
+                    alwaysShow: true
+                });
+                
+                indoorMap.setMap(map);
+                
+                // 监听楼层变化事件
+                indoorMap.on('floor_change', function(event) {
+                    console.log('地图楼层切换:', event.floor);
+                    // 同步更新UI
+                    if (event.floor && event.floor !== currentFloor) {
+                        currentFloor = event.floor;
+                        updateFloorUI(event.floor);
+                    }
+                });
+                
+                updateStatus('室内地图插件加载成功！请搜索或选择商场', 'success');
+                
+            } catch (error) {
+                updateStatus('室内地图加载失败: ' + error.message, 'error');
+                console.error('室内地图错误:', error);
+            }
+        }
+        
+        // 更新楼层UI（当地图触发楼层变化时）
+        function updateFloorUI(floorName) {
+            document.querySelectorAll('.floor-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.floor === floorName) {
+                    item.classList.add('active');
+                }
+            });
+            
+            document.querySelectorAll('.map-floor-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.floor === floorName) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        // 加载指定建筑（从预设列表）
+        function loadBuilding(element) {
+            const buildingId = element.dataset.building;
+            const buildingName = element.dataset.name;
+            const lng = parseFloat(element.dataset.lng);
+            const lat = parseFloat(element.dataset.lat);
+            const address = element.querySelector('p').textContent;
+            
+            document.querySelectorAll('.building-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+            
+            document.querySelectorAll('.result-item').forEach(item => {
+                item.style.background = 'rgba(255,255,255,0.05)';
+                item.style.borderLeftColor = 'transparent';
+            });
+            
+            currentBuilding = buildingId;
+            currentBuildingInfo = { name: buildingName, address, poiId: buildingId };
+            
+            updateBuildingInfo(buildingName, address);
+            loadBuildingData(buildingId, buildingName, lng, lat);
+        }
+        
+        // 添加标记（当前选中建筑）—— 不清除预设标记，避免重叠
+        function addMarker(lng, lat, title) {
+            // 移除同 id 的预设标记，避免与当前标记重叠
+            for (let i = presetMarkers.length - 1; i >= 0; i--) {
+                if (presetMarkers[i].id === currentBuilding) {
+                    map.remove(presetMarkers[i].marker);
+                    presetMarkers.splice(i, 1);
+                }
+            }
+            if (currentMarker) { map.remove(currentMarker); currentMarker = null; }
+            
+            const marker = new AMap.Marker({
+                position: [lng, lat],
+                title: title,
+                animation: 'AMAP_ANIMATION_DROP'
+            });
+            
+            const infoWindow = new AMap.InfoWindow({
+                content: '<div style="padding:10px;min-width:160px;">' +
+                    '<strong>' + title + '</strong><br>' +
+                    'POI ID: ' + (currentBuilding || 'N/A') + '<br>' +
+                    '当前楼层: ' + (currentFloor || '未选择') + '<br>' +
+                    '<button style="margin-top:8px;width:100%;padding:6px 10px;border:none;border-radius:6px;' +
+                    'background:linear-gradient(135deg,#00d4ff,#7b2cbf);color:#fff;cursor:pointer;font-size:13px;" ' +
+                    'onclick="enterMall()">🏪 进入 3D 漫游</button></div>',
+                offset: new AMap.Pixel(0, -30)
+            });
+            
+            marker.on('click', function() {
+                _lastMarkerClickTs = Date.now();
+                infoWindow.open(map, marker.getPosition());
+            });
+            
+            marker.setMap(map);
+            currentMarker = marker;
+        }
+        
+        // 绑定建筑列表点击事件
+        document.querySelectorAll('.building-item').forEach(item => {
+            item.addEventListener('click', function() {
+                loadBuilding(this);
+            });
+        });
+        
+        // 回车键搜索
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchBuildings();
+            }
+        });
+        
+        /* =========================================================
+         * 3D 室内建模（Three.js）—— 进入商场漫游
+         * ========================================================= */
+        const SHOP_BRANDS = {
+            shopping:      ['优衣库', 'ZARA', 'H&M', '无印良品', 'Nike', 'Adidas', 'Apple', '丝芙兰', '周大福', '潮宏基', 'GAP', 'COS', '李宁', '安踏', '小米之家'],
+            dining:        ['海底捞', '西贝莜面村', '外婆家', '肯德基', '麦当劳', '必胜客', '喜茶', '奈雪的茶', '太二酸菜鱼', '绿茶餐厅', '南京大牌档', '探鱼', '巴奴火锅', '星巴克'],
+            entertainment: ['万达影城', 'CGV影城', '密室逃脱', '温莎KTV', '大玩家电玩', '超级猩猩健身', '孩子王', '蹦床公园', '奇乐儿'],
+            parking:       ['P1停车场', 'P2停车场', '汽车美容', '充电桩专区', '洗车服务', 'ETC通道']
+        };
+        const CAT_META = {
+            shopping:      { color: 0x3b82f6, label: '购物', css: '#3b82f6' },
+            dining:        { color: 0xf59e0b, label: '餐饮', css: '#f59e0b' },
+            entertainment: { color: 0x4ade80, label: '娱乐', css: '#4ade80' },
+            parking:       { color: 0x9ca3af, label: '停车', css: '#9ca3af' }
+        };
+        // 3D 建模可自定义参数（用户可在「自定义」面板中调整）
+        let indoorConfig = {
+            W: 140, D: 100, FH: 20,        // 建筑宽 / 深 / 层高
+            COLS: 8, ROWS: 6,             // 店铺网格列 / 行（默认值，可被逐层覆盖）
+            atrium: true,                 // 是否生成中庭广场（仅矩形模式，可被逐层覆盖）
+            labels: true,                 // 是否显示店铺文字标签
+            autoRotate: false,            // 是否自动旋转
+            footprint: null               // 整栋建筑轮廓：null=按 W×D 矩形，或 [{x,z},...] 多边形
+        };
+
+        // 逐层编辑覆盖（按楼层名索引）：每层可独立设置轮廓/网格/中庭/店铺/墙/设施
+        let indoorEdit = { floors: {} };
+
+        // 编辑工具状态
+        let editMode = null;        // null=浏览 | 'wall'=加内墙 | 'shop'=编辑店铺 | 'facility'=放设施
+        let editFacilityType = 'elevator'; // 当前要放置的设施类型
+        let editWallPts = [];       // 绘制内墙时的临时端点
+        let editWallPtMarks = [];   // 绘制内墙时的临时角点标记
+        let editDrag = null;        // 拖拽中：{ id, floor, fi }
+        let editSelShopId = null;   // 当前选中的店铺 id
+
+        // 取当前楼层名
+        function curFloorName() {
+            const f = (floorData && floorData[indoor.current]) || null;
+            return (f && f.name) ? f.name : ('F' + indoor.current);
+        }
+        // 取（或建）某层的编辑覆盖对象
+        function floorEdit(name) {
+            if (!indoorEdit.floors[name]) indoorEdit.floors[name] = {};
+            return indoorEdit.floors[name];
+        }
+
+        // 3D 运行时状态（单例，进入/退出时重建）
+        let indoor = {
+            active: false, scene: null, camera: null, renderer: null, labelRenderer: null,
+            controls: null, raycaster: null, mouse: null, floors: [], current: 0,
+            selected: null, animId: null, mallName: null, nav: null,
+            _onMove: null, _onClick: null, _onResize: null
+        };
+
+        // 高德真实室内店铺数据（按楼层归类）；available=false 时回退到生成式店铺
+        let realIndoorShops = { available: false, byFloor: {}, floors: [] };
+
+        // 轮廓绘制（自由建墙）临时状态
+        let drawState = null; // { points:[], markers:[], line, plane, downXY, handlers }
+        let drawTarget = 'building'; // 'building'=整栋轮廓 | 'floor'=当前层轮廓
+
+        // 基于楼层功能倾向加权分配店铺品类
+        function pickCategory(floorType) {
+            const weights = {
+                shopping:      [0.70, 0.12, 0.08, 0.10],
+                dining:        [0.12, 0.70, 0.10, 0.08],
+                entertainment: [0.10, 0.15, 0.65, 0.10],
+                parking:       [0.05, 0.05, 0.05, 0.85]
+            };
+            const w = weights[floorType] || weights.shopping;
+            const cats = ['shopping', 'dining', 'entertainment', 'parking'];
+            const r = Math.random();
+            let acc = 0;
+            for (let i = 0; i < cats.length; i++) { acc += w[i]; if (r <= acc) return cats[i]; }
+            return 'shopping';
+        }
+        const _brandIdx = {};
+        function pickBrand(cat) {
+            const arr = SHOP_BRANDS[cat];
+            _brandIdx[cat] = (_brandIdx[cat] || 0);
+            const name = arr[_brandIdx[cat] % arr.length];
+            _brandIdx[cat]++;
+            return name;
+        }
+
+        // 进入商场 → 切换到室内 3D 模式
+        function enterMall() {
+            if (!currentBuilding || !currentBuildingInfo) {
+                updateStatus('请先选择或搜索一个商场', 'error');
+                return;
+            }
+            if (typeof THREE === 'undefined') {
+                updateStatus('3D 组件未加载（Three.js CDN 失败），无法进入', 'error');
+                return;
+            }
+            document.body.classList.add('indoor-mode');
+            document.getElementById('modeBadge').textContent = '🏪 室内 3D 模式';
+            const overlay = document.getElementById('indoorOverlay');
+            overlay.classList.add('active');
+            requestAnimationFrame(() => overlay.classList.add('show'));
+            document.getElementById('hudMallTitle').firstChild.textContent = '🏪 ' + (currentBuildingInfo.name || '商场');
+            buildIndoorScene(currentBuildingInfo.name || '商场');
+        }
+
+        // 返回地图 → 销毁 3D 场景，回到室外
+        function exitMall() {
+            const overlay = document.getElementById('indoorOverlay');
+            const panel = document.getElementById('customPanel');
+            if (panel) panel.classList.remove('open');
+            const ns = document.getElementById('hudNavSteps');
+            if (ns) { ns.style.display = 'none'; ns.innerHTML = ''; }
+            overlay.classList.remove('show');
+            setTimeout(() => {
+                overlay.classList.remove('active');
+                document.body.classList.remove('indoor-mode');
+                document.getElementById('modeBadge').textContent = '🌍 室外地图模式';
+                disposeIndoor();
+                // 室外地图容器在 3D 模式期间被 display:none 隐藏，恢复可见后尺寸变为 0，
+                // 高德地图不会自动感知尺寸变化，必须手动 resize 否则地图空白/无法交互。
+                if (map && typeof map.resize === 'function') {
+                    map.resize();
+                    requestAnimationFrame(function () { if (map && map.resize) map.resize(); });
+                }
+                updateStatus('已返回室外地图', 'success');
+            }, 450);
+        }
+
+        // 内墙几何：端点 (x1,z1)-(x2,z2)，贴在本层楼板顶面上
+        function createWallMesh(w, groundY, fh) {
+            const dx = w.x2 - w.x1, dz = w.z2 - w.z1;
+            const len = Math.hypot(dx, dz) || 0.01;
+            const m = new THREE.Mesh(
+                new THREE.BoxGeometry(len, fh, 4),
+                new THREE.MeshStandardMaterial({ color: 0xcfd8ff, emissive: 0x223355, emissiveIntensity: 0.25, metalness: 0.3, roughness: 0.5, side: THREE.DoubleSide })
+            );
+            m.position.set((w.x1 + w.x2) / 2, groundY + fh / 2, (w.z1 + w.z2) / 2);
+            m.rotation.y = -Math.atan2(dz, dx);
+            m.userData = { kind: 'wall', wall: w, floor: w.floor };
+            return m;
+        }
+        // 设施几何：电梯 / 扶梯 / 楼梯 / 中庭喷泉
+        function createFacilityMesh(fac, groundY) {
+            const g = new THREE.Group();
+            const mk = (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.25, metalness: 0.4, roughness: 0.4 });
+            if (fac.type === 'elevator') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(8, 18, 8), mk(0x6fb1ff)); g.add(body);
+                const top = new THREE.Mesh(new THREE.BoxGeometry(9, 2, 9), mk(0x00d4ff)); top.position.y = 10; g.add(top);
+            } else if (fac.type === 'escalator') {
+                for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 14), mk(0x9fe8ff)); s.position.set(0, i * 6, 0); s.rotation.x = 0.25; g.add(s); }
+            } else if (fac.type === 'stairs') {
+                for (let i = 0; i < 6; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(10, 2, 5), mk(0xc0c8e0)); s.position.set(0, i * 3, i * 4 - 10); g.add(s); }
+            } else { // fountain
+                const pool = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 2, 24), mk(0x2a6f97)); g.add(pool);
+                const water = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 1, 24), new THREE.MeshStandardMaterial({ color: 0x39c5ff, emissive: 0x39c5ff, emissiveIntensity: 0.4, transparent: true, opacity: 0.7 })); water.position.y = 1.2; g.add(water);
+                const jet = new THREE.Mesh(new THREE.ConeGeometry(3, 12, 16), mk(0x9fe8ff)); jet.position.y = 8; g.add(jet);
+            }
+            g.position.set(fac.x, groundY, fac.z);
+            g.userData = { kind: 'facility', fac: fac, floor: fac.floor };
+            return g;
+        }
+
+        // 构建 3D 商场场景
+        function buildIndoorScene(name) {
+            indoor.mallName = name;
+            const { W, D, FH, COLS, ROWS, atrium, labels } = indoorConfig;
+            const floorsData = (floorData && floorData.length) ? floorData : generateDefaultFloors();
+
+            const overlay = document.getElementById('indoorOverlay');
+
+            // 动态创建 canvas（避免复用已丢失的 WebGL 上下文）
+            const canvas = document.createElement('canvas');
+            canvas.id = 'indoorCanvas';
+            overlay.insertBefore(canvas, overlay.firstChild);
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0b0b18);
+            scene.fog = new THREE.Fog(0x0b0b18, 280, 680);
+
+            const camera = new THREE.PerspectiveCamera(55, overlay.clientWidth / overlay.clientHeight, 0.1, 2000);
+            camera.position.set(W * 0.95, FH * floorsData.length * 0.7 + 70, D * 1.35);
+
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+            renderer.setSize(overlay.clientWidth, overlay.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            const labelRenderer = new THREE.CSS2DRenderer();
+            labelRenderer.setSize(overlay.clientWidth, overlay.clientHeight);
+            labelRenderer.domElement.style.position = 'absolute';
+            labelRenderer.domElement.style.top = '0';
+            labelRenderer.domElement.style.left = '0';
+            labelRenderer.domElement.style.pointerEvents = 'none';
+            overlay.appendChild(labelRenderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.08;
+            controls.maxPolarAngle = Math.PI * 0.49;
+            controls.minDistance = 40;
+            controls.maxDistance = 760;
+            controls.target.set(0, (floorsData.length - 1) * FH * 0.5, 0);
+            controls.autoRotate = indoorConfig.autoRotate;
+            controls.autoRotateSpeed = 0.9;
+
+            // 灯光
+            scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+            const dir = new THREE.DirectionalLight(0xbfe9ff, 0.9);
+            dir.position.set(120, 320, 160);
+            scene.add(dir);
+            const glow = new THREE.PointLight(0x00d4ff, 0.6, 700);
+            glow.position.set(0, FH * floorsData.length, 0);
+            scene.add(glow);
+
+            // ===== 建筑轮廓（矩形或用户绘制的多边形） =====
+            // ===== 楼层级配置合并（支持逐层独立设置：轮廓/网格/中庭/店铺/墙/设施） =====
+            function floorCfg(f) {
+                const ov = (indoorEdit.floors && indoorEdit.floors[f.name]) || {};
+                return {
+                    footprint: (typeof ov.footprint !== 'undefined') ? ov.footprint : indoorConfig.footprint,
+                    COLS: (typeof ov.COLS === 'number') ? ov.COLS : indoorConfig.COLS,
+                    ROWS: (typeof ov.ROWS === 'number') ? ov.ROWS : indoorConfig.ROWS,
+                    atrium: (typeof ov.atrium === 'boolean') ? ov.atrium : indoorConfig.atrium,
+                    shopOverrides: ov.shopOverrides || {},
+                    customShops: ov.customShops || [],
+                    walls: ov.walls || [],
+                    facilities: ov.facilities || []
+                };
+            }
+            function bboxOf(fp) {
+                if (!fp || fp.length < 3) return null;
+                let a = 1e9, b = -1e9, c = 1e9, d = -1e9;
+                fp.forEach(p => { a = Math.min(a, p.x); b = Math.max(b, p.x); c = Math.min(c, p.z); d = Math.max(d, p.z); });
+                return { minX: a, maxX: b, minZ: c, maxZ: d };
+            }
+            // 整栋外形 = 建筑级轮廓（优先）否则所有楼层轮廓的并集包围盒
+            const allB = floorsData.map(f => bboxOf(floorCfg(f).footprint));
+            let buildBBox = bboxOf(indoorConfig.footprint);
+            if (!buildBBox) {
+                buildBBox = { minX: -W / 2, maxX: W / 2, minZ: -D / 2, maxZ: D / 2 };
+                allB.forEach(b => { if (!b) return; buildBBox.minX = Math.min(buildBBox.minX, b.minX); buildBBox.maxX = Math.max(buildBBox.maxX, b.maxX); buildBBox.minZ = Math.min(buildBBox.minZ, b.minZ); buildBBox.maxZ = Math.max(buildBBox.maxZ, b.maxZ); });
+            }
+            const buildFootprint = (indoorConfig.footprint && indoorConfig.footprint.length >= 3) ? indoorConfig.footprint : null;
+
+            function shapeFromFootprint(fp) {
+                const s = new THREE.Shape();
+                if (fp && fp.length >= 3) {
+                    s.moveTo(fp[0].x, -fp[0].z);
+                    for (let i = 1; i < fp.length; i++) s.lineTo(fp[i].x, -fp[i].z);
+                } else {
+                    s.moveTo(buildBBox.minX, -buildBBox.minZ);
+                    s.lineTo(buildBBox.maxX, -buildBBox.minZ);
+                    s.lineTo(buildBBox.maxX, buildBBox.maxZ);
+                    s.lineTo(buildBBox.minX, buildBBox.maxZ);
+                }
+                s.closePath();
+                return s;
+            }
+            function pointInFootprint(x, z, fp) {
+                if (fp && fp.length >= 3) {
+                    let inside = false;
+                    for (let i = 0, j = fp.length - 1; i < fp.length; j = i++) {
+                        const xi = fp[i].x, zi = fp[i].z, xj = fp[j].x, zj = fp[j].z;
+                        if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) inside = !inside;
+                    }
+                    return inside;
+                }
+                return x >= buildBBox.minX && x <= buildBBox.maxX && z >= buildBBox.minZ && z <= buildBBox.maxZ;
+            }
+            function makePrismWith(shp, depth, mat, yPos) {
+                const g = new THREE.ExtrudeGeometry(shp, { depth: depth, bevelEnabled: false });
+                const m = new THREE.Mesh(g, mat);
+                m.rotation.x = -Math.PI / 2;
+                m.position.y = yPos;
+                return m;
+            }
+
+            const slabGroundY = -FH / 2 + 1; // 楼板顶面（局部坐标）
+            // 底座（整栋并集包围盒）
+            scene.add(makePrismWith(shapeFromFootprint(buildFootprint), 6, new THREE.MeshStandardMaterial({ color: 0x10203a, metalness: 0.3, roughness: 0.7 }), -3));
+
+            // ===== 逐层楼板 + 半透明外墙（按本层轮廓）+ 店铺/墙/设施 =====
+            const useReal = !!(realIndoorShops && realIndoorShops.available);
+            const floors = [];
+
+            floorsData.forEach((f, fi) => {
+                const fc = floorCfg(f);
+                const fp = fc.footprint;
+                const isPoly = !!(fp && fp.length >= 3);
+                const bbox = isPoly ? bboxOf(fp) : buildBBox;
+                const spanX = bbox.maxX - bbox.minX, spanZ = bbox.maxZ - bbox.minZ;
+                const group = new THREE.Group();
+                group.position.y = fi * FH;
+
+                // 楼板（按本层轮廓）
+                group.add(makePrismWith(shapeFromFootprint(fp), 2, new THREE.MeshStandardMaterial({ color: 0x1b2a44, transparent: true, opacity: 1, metalness: 0.2, roughness: 0.8 }), -FH / 2));
+
+                // 本层半透明玻璃外墙（按本层轮廓，独立形状可见）
+                const wallH = FH * 0.82;
+                group.add(makePrismWith(shapeFromFootprint(fp), wallH, new THREE.MeshStandardMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.05, metalness: 0.1, roughness: 0.05, side: THREE.DoubleSide }), -FH / 2 + 1));
+                // 顶层屋顶发光边
+                if (fi === floorsData.length - 1) {
+                    const re = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.ExtrudeGeometry(shapeFromFootprint(fp), { depth: wallH, bevelEnabled: false })),
+                        new THREE.LineBasicMaterial({ color: 0x00d4ff })
+                    );
+                    re.rotation.x = -Math.PI / 2;
+                    re.position.y = -FH / 2 + 1;
+                    group.add(re);
+                }
+
+                // —— 店铺网格（按轮廓裁剪，优先真实店铺，支持逐店覆盖/新增） ——
+                let cols = fc.COLS, rows = fc.ROWS;
+                if (useReal) {
+                    let maxReal = 0;
+                    floorsData.forEach(ff => { const l = realIndoorShops.byFloor[ff.name] || []; if (l.length > maxReal) maxReal = l.length; });
+                    rows = Math.max(rows, Math.ceil(maxReal / cols));
+                    if (isPoly) rows = Math.ceil(rows * 1.8);
+                }
+                const cellW = spanX / cols, cellD = spanZ / rows;
+                const shopH = FH * 0.62;
+                const aC0 = Math.floor(cols / 2) - 1, aC1 = Math.floor(cols / 2);
+                const aR0 = Math.floor(rows / 2) - 1, aR1 = Math.floor(rows / 2);
+                const shops = [];
+                const realList = useReal ? (realIndoorShops.byFloor[f.name] || []) : [];
+                let realIdx = 0;
+                for (let c = 0; c < cols; c++) {
+                    for (let r = 0; r < rows; r++) {
+                        if (!isPoly && fc.atrium && (c === aC0 || c === aC1) && (r === aR0 || r === aR1)) continue; // 矩形模式的中庭
+                        const cx = bbox.minX + cellW * (c + 0.5);
+                        const cz = bbox.minZ + cellD * (r + 0.5);
+                        if (!pointInFootprint(cx, cz, fp)) continue; // 轮廓外不放置
+                        const id = 's' + fi + '_' + c + '_' + r;
+                        const ov = fc.shopOverrides[id];
+                        if (ov && ov.deleted) continue;
+                        let name, cat, meta, desc, real = false;
+                        if (ov && ov.cat) {
+                            cat = ov.cat; name = ov.name || pickBrand(cat);
+                            desc = `${CAT_META[cat].label}区 · ${f.display} · 自定义`;
+                        } else if (realList[realIdx]) {
+                            real = realList[realIdx]; cat = real.cat; name = real.name; realIdx++;
+                            desc = `${CAT_META[cat].label}区 · ${f.display} · 高德真实店铺`;
+                        } else {
+                            cat = pickCategory(f.type); name = pickBrand(cat);
+                            desc = `${CAT_META[cat].label}区 · ${f.display} · ${(cat === f.type) ? '主力业态' : '配套业态'}`;
+                        }
+                        let sx = (ov && ov.x != null) ? ov.x : cx, sz = (ov && ov.z != null) ? ov.z : cz;
+                        let sw = (ov && ov.w != null) ? ov.w : cellW * 0.82, sd = (ov && ov.d != null) ? ov.d : cellD * 0.82;
+                        const mat = new THREE.MeshStandardMaterial({ color: CAT_META[cat].color, transparent: true, opacity: 1, emissive: CAT_META[cat].color, emissiveIntensity: 0.12, metalness: 0.2, roughness: 0.6 });
+                        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sw, shopH, sd), mat);
+                        const localY = -FH / 2 + 2 + shopH / 2;
+                        mesh.position.set(sx, localY, sz);
+                        const data = { id, name, cat, floor: f.display, desc, real: !!real };
+                        mesh.userData = { shop: data, id: id, kind: 'shop', floor: f.name };
+                        group.add(mesh);
+                        let label = null;
+                        if (labels) {
+                            const labelDiv = document.createElement('div');
+                            labelDiv.textContent = name;
+                            labelDiv.style.cssText = 'color:#dff;font-size:10px;background:rgba(11,11,24,.6);padding:1px 5px;border-radius:4px;border:1px solid rgba(255,255,255,.15);white-space:nowrap;pointer-events:none;';
+                            label = new THREE.CSS2DObject(labelDiv);
+                            label.position.set(sx, localY + shopH / 2 + 1, sz);
+                            group.add(label);
+                        }
+                        shops.push({ mesh, label, data, world: new THREE.Vector3(sx, fi * FH + localY, sz) });
+                    }
+                }
+                // 用户新增店铺
+                fc.customShops.forEach(cs => {
+                    const meta = CAT_META[cs.cat];
+                    const mat = new THREE.MeshStandardMaterial({ color: meta.color, transparent: true, opacity: 1, emissive: meta.color, emissiveIntensity: 0.12, metalness: 0.2, roughness: 0.6 });
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(cs.w || 12, shopH, cs.d || 12), mat);
+                    const localY = -FH / 2 + 2 + shopH / 2;
+                    mesh.position.set(cs.x, localY, cs.z);
+                    const data = { id: cs.id, name: cs.name, cat: cs.cat, floor: f.display, desc: `${meta.label}区 · ${f.display} · 自定义新增`, real: false };
+                    mesh.userData = { shop: data, id: cs.id, kind: 'shop', floor: f.name };
+                    group.add(mesh);
+                    let label = null;
+                    if (labels) {
+                        const labelDiv = document.createElement('div'); labelDiv.textContent = cs.name;
+                        labelDiv.style.cssText = 'color:#dff;font-size:10px;background:rgba(11,11,24,.6);padding:1px 5px;border-radius:4px;border:1px solid rgba(255,255,255,.15);white-space:nowrap;pointer-events:none;';
+                        label = new THREE.CSS2DObject(labelDiv); label.position.set(cs.x, localY + shopH / 2 + 1, cs.z); group.add(label);
+                    }
+                    shops.push({ mesh, label, data, world: new THREE.Vector3(cs.x, fi * FH + localY, cs.z) });
+                });
+                // 内墙
+                fc.walls.forEach(w => { const m = createWallMesh(w, slabGroundY, FH * 0.82); m.userData.floor = f.name; group.add(m); });
+                // 设施
+                fc.facilities.forEach(fac => { const m = createFacilityMesh(fac, slabGroundY); m.userData.floor = f.name; group.add(m); });
+
+                scene.add(group);
+                floors.push({ index: fi, group, y: fi * FH, shops, data: f, footprint: fp, bbox: bbox });
+            });
+
+            // ===== 交互：射线拾取 + 编辑工具（拖拽阈值区分旋转/点击） =====
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            let hovered = null, selected = null;
+            let downPos = null;       // 按下位置（区分点击/旋转）
+            let downShop = null;      // 按下时的店铺候选（用于拖拽）
+            indoor.wallPreviewLine = null;
+            editWallPtMarks = [];
+
+            function setEmissive(mesh, v) { if (mesh && mesh.material) mesh.material.emissiveIntensity = v; }
+            function floorShops() { return floors[indoor.current] ? floors[indoor.current].shops.map(s => s.mesh) : []; }
+            function floorWalls() { return floors[indoor.current] ? floors[indoor.current].group.children.filter(o => o.userData && o.userData.kind === 'wall') : []; }
+            function floorFacs() { return floors[indoor.current] ? floors[indoor.current].group.children.filter(o => o.userData && o.userData.kind === 'facility') : []; }
+            function groundY() { return indoor.current * FH + slabGroundY; }
+            function screenToMeshes(e, objs, rec) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                return raycaster.intersectObjects(objs, !!rec);
+            }
+            function groundHit(e) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -groundY());
+                const hit = new THREE.Vector3();
+                if (raycaster.ray.intersectPlane(plane, hit)) return hit;
+                return null;
+            }
+
+            function onMove(e) {
+                if (drawState) return;
+                // 编辑店铺模式：超过阈值则开始拖拽
+                if (editMode === 'shop' && downShop && downPos && !editDrag) {
+                    const dx = e.clientX - downPos[0], dy = e.clientY - downPos[1];
+                    if (dx * dx + dy * dy > 36) {
+                        editDrag = { id: downShop.userData.id, floor: downShop.userData.floor };
+                        if (indoor.controls) indoor.controls.enabled = false;
+                        renderer.domElement.style.cursor = 'move';
+                    }
+                }
+                if (editDrag) { // 拖拽店铺：实时移动到地面交点
+                    const hit = groundHit(e);
+                    if (hit) {
+                        const entry = floors[indoor.current].shops.find(s => s.data.id === editDrag.id);
+                        if (entry) {
+                            entry.mesh.position.x = hit.x; entry.mesh.position.z = hit.z;
+                            if (entry.label) { entry.label.position.x = hit.x; entry.label.position.z = hit.z; }
+                            entry.world.x = hit.x; entry.world.z = hit.z;
+                            entry.data.x = hit.x; entry.data.z = hit.z;
+                        }
+                    }
+                    return;
+                }
+                if (editMode === 'wall' && editWallPts.length) { // 画墙实时预览
+                    const hit = groundHit(e); if (hit) updateWallPreview(hit);
+                    renderer.domElement.style.cursor = 'crosshair';
+                    return;
+                }
+                if (!editMode) { // 浏览模式悬停提示
+                    const hits = screenToMeshes(e, floorShops(), false);
+                    const tip = document.getElementById('hudTooltip');
+                    if (hits.length) {
+                        const s = hits[0].object.userData.shop;
+                        const ob = overlay.getBoundingClientRect();
+                        tip.style.display = 'block';
+                        tip.style.left = (e.clientX - ob.left + 14) + 'px';
+                        tip.style.top = (e.clientY - ob.top + 14) + 'px';
+                        tip.innerHTML = `<div class="t-name">${s.name}</div><div class="t-cat" style="color:${CAT_META[s.cat].css}">${CAT_META[s.cat].label} · ${s.floor}</div><div style="margin-top:3px;color:#9ab;">${s.desc}</div>`;
+                        if (hovered && hovered !== hits[0].object) setEmissive(hovered, 0.12);
+                        hovered = hits[0].object; setEmissive(hovered, 0.5);
+                        renderer.domElement.style.cursor = 'pointer';
+                    } else {
+                        tip.style.display = 'none';
+                        if (hovered) { setEmissive(hovered, hovered === selected ? 0.5 : 0.12); hovered = null; }
+                        renderer.domElement.style.cursor = 'grab';
+                    }
+                } else {
+                    renderer.domElement.style.cursor = 'crosshair';
+                }
+            }
+            function onDown(e) {
+                if (drawState) return;
+                if (e.button !== undefined && e.button !== 0) return; // 仅响应左键
+                downPos = [e.clientX, e.clientY];
+                downShop = null;
+                if (editMode === 'shop') {
+                    const hits = screenToMeshes(e, floorShops(), false);
+                    downShop = hits.length ? hits[0].object : null;
+                    // 仅当点中店铺（准备拖拽）时临时接管手势，避免干扰视角旋转
+                    if (downShop && indoor.controls) indoor.controls.enabled = false;
+                }
+                // 其他编辑模式（加墙/放设施）保持 OrbitControls 启用，拖拽即可旋转视角
+            }
+            function onUp(e) {
+                if (drawState) return;
+                if (!downPos) return;
+                try {
+                    const dx = e.clientX - downPos[0], dy = e.clientY - downPos[1];
+                    const moved = dx * dx + dy * dy > 36; // 超过阈值视为旋转视角
+                    downPos = null;
+                    if (editMode === 'shop') {
+                        if (editDrag) { commitShopDrag(); return; }
+                        if (!moved) { const hits = screenToMeshes(e, floorShops(), false); if (hits.length) selectShop(hits[0].object.userData.shop); }
+                        downShop = null;
+                        return;
+                    }
+                    if (editMode === 'wall') {
+                        if (moved) return;
+                        const wallHits = screenToMeshes(e, floorWalls(), false);
+                        if (wallHits.length) { removeWall(wallHits[0].object); return; }
+                        const hit = groundHit(e); if (hit) addWallPointLive(hit);
+                        return;
+                    }
+                    if (editMode === 'facility') {
+                        if (moved) return;
+                        const facHits = screenToMeshes(e, floorFacs(), true);
+                        if (facHits.length) {
+                            let obj = facHits[0].object;
+                            while (obj && !(obj.userData && obj.userData.kind === 'facility')) obj = obj.parent;
+                            if (obj) removeFacility(obj);
+                            return;
+                        }
+                        const hit = groundHit(e); if (hit) placeFacility(hit);
+                        return;
+                    }
+                    // 浏览模式：点击选中店铺（用于导航）
+                    if (!editMode && !moved) {
+                        const hits = screenToMeshes(e, floorShops(), false);
+                        if (hits.length) selectShop(hits[0].object.userData.shop);
+                    }
+                } catch (err) {
+                    showErr('编辑操作出错: ' + (err && err.message ? err.message : err));
+                    if (window.console) console.error(err);
+                } finally {
+                    // 编辑手势结束后恢复 OrbitControls，便于继续漫游
+                    if (editMode && indoor.controls) indoor.controls.enabled = true;
+                }
+            }
+            function commitShopDrag() {
+                const entry = floors[indoor.current].shops.find(s => s.data.id === editDrag.id);
+                if (entry) {
+                    const fe = floorEdit(curFloorName());
+                    fe.shopOverrides = fe.shopOverrides || {};
+                    fe.shopOverrides[editDrag.id] = { x: entry.data.x, z: entry.data.z, cat: entry.data.cat, name: entry.data.name };
+                }
+                editDrag = null;
+                if (indoor.controls) indoor.controls.enabled = true;
+                updateStatus('已移动店铺到新位置', 'success');
+            }
+            function updateWallPreview(hit) {
+                if (indoor.wallPreviewLine) { scene.remove(indoor.wallPreviewLine); indoor.wallPreviewLine.geometry.dispose(); indoor.wallPreviewLine = null; }
+                const pts = editWallPts.concat([{ x: hit.x, z: hit.z }]).map(p => new THREE.Vector3(p.x, groundY() + 1, p.z));
+                if (pts.length >= 2) {
+                    indoor.wallPreviewLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffd166 }));
+                    scene.add(indoor.wallPreviewLine);
+                }
+            }
+            function addWallPointLive(hit) {
+                editWallPts.push({ x: +hit.x.toFixed(1), z: +hit.z.toFixed(1) });
+                const mk = new THREE.Mesh(new THREE.SphereGeometry(2, 12, 12), new THREE.MeshBasicMaterial({ color: 0xffd166 }));
+                mk.position.set(hit.x, groundY(), hit.z);
+                scene.add(mk);
+                editWallPtMarks.push(mk);
+                if (editWallPts.length >= 2) {
+                    const a = editWallPts[0], b = editWallPts[1];
+                    const fName = curFloorName();
+                    const fe = floorEdit(fName);
+                    fe.walls = fe.walls || [];
+                    const w = { x1: a.x, z1: a.z, x2: b.x, z2: b.z, floor: fName };
+                    fe.walls.push(w);
+                    const m = createWallMesh(w, slabGroundY, FH * 0.82);
+                    m.userData.floor = fName;
+                    floors[indoor.current].group.add(m);
+                    updateStatus('已添加一段内墙（点击两点连一段，可继续）', 'success');
+                    clearWallDraft();
+                }
+            }
+            function placeFacility(hit) {
+                const fName = curFloorName();
+                const fe = floorEdit(fName);
+                fe.facilities = fe.facilities || [];
+                const fac = { type: editFacilityType, x: +hit.x.toFixed(1), z: +hit.z.toFixed(1), floor: fName };
+                fe.facilities.push(fac);
+                const m = createFacilityMesh(fac, slabGroundY);
+                m.userData.floor = fName;
+                floors[indoor.current].group.add(m);
+                updateStatus('已放置' + facilityLabel(editFacilityType), 'success');
+            }
+            function removeFacility(obj) {
+                const fac = obj.userData.fac; const fName = obj.userData.floor || curFloorName();
+                const fe = indoorEdit.floors[fName];
+                if (fe && fe.facilities) { const i = fe.facilities.indexOf(fac); if (i >= 0) fe.facilities.splice(i, 1); }
+                floors[indoor.current].group.remove(obj);
+                obj.traverse(n => { if (n.geometry) n.geometry.dispose(); if (n.material) { Array.isArray(n.material) ? n.material.forEach(m => m.dispose()) : n.material.dispose(); } });
+                updateStatus('已删除设施', 'success');
+            }
+            function removeWall(obj) {
+                const w = obj.userData.wall; const fName = obj.userData.floor || curFloorName();
+                const fe = indoorEdit.floors[fName];
+                if (fe && fe.walls) { const i = fe.walls.indexOf(w); if (i >= 0) fe.walls.splice(i, 1); }
+                floors[indoor.current].group.remove(obj);
+                if (obj.geometry) obj.geometry.dispose(); if (obj.material) obj.material.dispose();
+                updateStatus('已删除一段内墙', 'success');
+            }
+            function facilityLabel(t) { return ({ elevator: '电梯', escalator: '扶梯', stairs: '楼梯', fountain: '中庭喷泉' })[t] || t; }
+
+            function selectShop(s) {
+                stopNavigation();
+                selected = s;
+                editSelShopId = s.id || null;
+                document.querySelectorAll('.shop-list-item').forEach(it => it.classList.toggle('active', it.dataset.name === s.name));
+                const d = document.getElementById('hudDetail');
+                d.classList.add('show');
+                document.getElementById('hudDetailName').textContent = s.name;
+                const cat = CAT_META[s.cat];
+                const ct = document.getElementById('hudDetailCat');
+                ct.textContent = cat.label; ct.style.background = cat.css + '33'; ct.style.color = cat.css;
+                document.getElementById('hudDetailFloor').textContent = s.floor;
+                document.getElementById('hudDetailDesc').textContent = s.desc;
+                if (editMode === 'shop') updateStatus('已选中「' + s.name + '」：按住拖动可移动，右侧可改色 / 删除 / 复位', 'success');
+            }
+            function focusShop(s) {
+                const entry = floors[indoor.current].shops.find(x => x.data === s);
+                if (!entry || !entry.world) return;
+                controls.target.copy(entry.world);
+                const dirv = camera.position.clone().sub(controls.target).normalize();
+                camera.position.copy(entry.world).add(dirv.multiplyScalar(130));
+            }
+
+            function applyFloorVisibility() {
+                floors.forEach((fl, i) => {
+                    const diff = Math.abs(i - indoor.current);
+                    const op = diff === 0 ? 1 : diff === 1 ? 0.35 : 0.12;  // 当前全亮，相邻半透明
+                    fl.group.children.forEach(o => {
+                        if (o.material) {
+                            o.material.opacity = op;
+                            o.material.transparent = op < 1;
+                            o.material.depthWrite = op >= 1;
+                        }
+                    });
+                    fl.shops.forEach(s => { if (s.label) s.label.visible = (i === indoor.current); }); // 仅当前层显示标签
+                });
+                controls.target.y = indoor.current * FH;
+            }
+            function render3DFloorCtrl() {
+                const ctrl = document.getElementById('hudFloorCtrl');
+                ctrl.innerHTML = '';
+                [...floors].reverse().forEach(fl => {
+                    const b = document.createElement('button');
+                    b.className = 'hud-floor-btn' + (fl.index === indoor.current ? ' active' : '');
+                    b.textContent = fl.data.display;
+                    b.onclick = () => switch3DFloor(fl.index);
+                    ctrl.appendChild(b);
+                });
+            }
+            function render3DShopList() {
+                const list = document.getElementById('hudShopList');
+                const fl = floors[indoor.current];
+                list.innerHTML = '';
+                fl.shops.forEach(s => {
+                    const it = document.createElement('div');
+                    it.className = 'shop-list-item'; it.dataset.name = s.data.name;
+                    it.innerHTML = `<span class="shop-cat-dot" style="background:${CAT_META[s.data.cat].css}"></span><span>${s.data.name}</span>`;
+                    it.onclick = () => { selectShop(s.data); focusShop(s.data); };
+                    list.appendChild(it);
+                });
+            }
+            function switch3DFloor(i) {
+                stopNavigation();
+                indoor.current = i;
+                applyFloorVisibility();
+                render3DFloorCtrl();
+                render3DShopList();
+                document.getElementById('hudDetail').classList.remove('show');
+                selected = null;
+                // 同步自定义面板到本层覆盖值
+                const p = document.getElementById('customPanel');
+                if (p && p.classList.contains('open')) syncCustomPanel();
+            }
+
+            // 停止并清理当前导航路径
+            function stopNavigation() {
+                if (indoor.nav) {
+                    if (indoor.nav.tube) scene.remove(indoor.nav.tube);
+                    if (indoor.nav.marker) scene.remove(indoor.nav.marker);
+                    if (indoor.nav.endCap) scene.remove(indoor.nav.endCap);
+                    indoor.nav = null;
+                }
+                const box = document.getElementById('hudNavSteps');
+                if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+            }
+
+            // 开始导航：从正门入口经中央走道到目标店铺，绘制发光路径 + 移动标记
+            function startNavigation() {
+                if (!selected) { updateStatus('请先点击选择一个店铺', 'error'); return; }
+                const target = selected;
+                stopNavigation(); // 清掉旧路径
+                const fi = floors.findIndex(fl => fl.shops.some(s => s.data === target));
+                if (fi < 0) return;
+                const entry = floors[fi].shops.find(s => s.data === target);
+                if (fi !== indoor.current) switch3DFloor(fi);
+
+                const fh = FH * 0.45;
+                const fl = floors[indoor.current];          // switch3DFloor 已切到目标层
+                const bb = fl.bbox;
+                const cxc = (bb.minX + bb.maxX) / 2, czc = (bb.minZ + bb.maxZ) / 2; // 本层中心（中庭）
+                const entranceZ = bb.maxZ - 4;             // 正门入口（本层 +Z 边）
+                const pts = [
+                    new THREE.Vector3(cxc, FH * 0.45, entranceZ),               // 正门入口
+                    new THREE.Vector3(cxc, FH * 0.45, czc),                     // 中庭
+                ];
+                if (fi > 0) pts.push(new THREE.Vector3(cxc, fi * FH + fh, czc));   // 垂直上至目标层中庭
+                pts.push(new THREE.Vector3(entry.world.x, fi * FH + fh, czc));  // 沿中央走道到目标列
+                pts.push(new THREE.Vector3(entry.world.x, fi * FH + fh, entry.world.z)); // 到店铺前
+
+                const curve = new THREE.CatmullRomCurve3(pts);
+                const tube = new THREE.Mesh(
+                    new THREE.TubeGeometry(curve, 90, 1.4, 8, false),
+                    new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.9, transparent: true, opacity: 0.92 })
+                );
+                scene.add(tube);
+
+                const marker = new THREE.Mesh(
+                    new THREE.SphereGeometry(3, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x00ff88, emissiveIntensity: 1.2 })
+                );
+                scene.add(marker);
+
+                const endCap = new THREE.Mesh(
+                    new THREE.SphereGeometry(4.5, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 1, transparent: true, opacity: 0.5 })
+                );
+                endCap.position.copy(pts[pts.length - 1]);
+                scene.add(endCap);
+
+                if (indoor.controls) indoor.controls.autoRotate = false;
+
+                // 步骤文本
+                const flDisp = floors[fi].data.display;
+                const catL = CAT_META[target.cat].label;
+                const steps = ['从正门入口进入商场（1 层）', '沿中央步行街直行至中庭'];
+                if (fi > 0) steps.push('经中庭扶梯上至 ' + flDisp + ' 层中庭');
+                steps.push('沿中央走道前往「' + target.name + '」前（' + flDisp + ' · ' + catL + '）');
+
+                const box = document.getElementById('hudNavSteps');
+                box.innerHTML = '<div class="ns-title">🧭 导航路线（至 ' + target.name + '）</div><ol>' +
+                    steps.map(s => '<li>' + s + '</li>').join('') + '</ol>';
+                const stopBtn = document.createElement('button');
+                stopBtn.className = 'nav-stop';
+                stopBtn.textContent = '✕ 停止导航';
+                stopBtn.onclick = stopNavigation;
+                box.appendChild(stopBtn);
+                box.style.display = 'block';
+
+                indoor.nav = { curve, tube, marker, endCap, progress: 0, target: target, floor: fi };
+                updateStatus('已开始导航：' + target.name, 'success');
+            }
+
+            function onResize() {
+                if (!indoor.active) return;
+                camera.aspect = overlay.clientWidth / overlay.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(overlay.clientWidth, overlay.clientHeight);
+                labelRenderer.setSize(overlay.clientWidth, overlay.clientHeight);
+            }
+            function animate() {
+                indoor.animId = requestAnimationFrame(animate);
+                controls.update();
+                if (indoor.nav && indoor.nav.marker && indoor.nav.curve) {
+                    indoor.nav.progress = Math.min(1, indoor.nav.progress + 0.004);
+                    indoor.nav.marker.position.copy(indoor.nav.curve.getPointAt(indoor.nav.progress));
+                }
+                renderer.render(scene, camera);
+                labelRenderer.render(scene, camera);
+            }
+
+            // 使用 pointer 事件（与 OrbitControls 同一套模型，且能随 setPointerCapture 可靠送达，
+            // 避免 mouseup 被指针捕获吞掉导致 onUp 不触发、编辑无反应）
+            renderer.domElement.addEventListener('pointermove', onMove);
+            renderer.domElement.addEventListener('pointerdown', onDown);
+            renderer.domElement.addEventListener('pointerup', onUp);
+            window.addEventListener('resize', onResize);
+
+            // 保存运行时引用（供销毁时清理）；每次重建重置编辑态
+            editMode = null; editWallPts = []; editDrag = null; editSelShopId = null;
+            Object.assign(indoor, {
+                active: true, scene, camera, renderer, labelRenderer, controls,
+                raycaster, mouse, floors, current: 0, selected: null,
+                switchFloor: switch3DFloor, nav: null,
+                _onMove: onMove, _onDown: onDown, _onUp: onUp, _onResize: onResize
+            });
+            const em = document.getElementById('editModeRow');
+            if (em) Array.from(em.children).forEach(b => b.classList.toggle('active', b.dataset.mode === ''));
+
+            const navBtn = document.getElementById('hudNavBtn');
+            if (navBtn) navBtn.onclick = startNavigation;
+
+            applyFloorVisibility();
+            render3DFloorCtrl();
+            render3DShopList();
+            animate();
+
+            const ld = document.getElementById('indoorLoading');
+            if (ld) ld.style.display = 'none';
+            updateStatus('已进入「' + name + '」3D 室内漫游模式', 'success');
+        }
+
+        // 销毁 3D 场景，释放资源
+        function disposeIndoor() {
+            if (indoor.animId) cancelAnimationFrame(indoor.animId);
+            if (drawState) endDrawFootprint();
+            if (indoor._onMove && indoor.renderer) indoor.renderer.domElement.removeEventListener('mousemove', indoor._onMove);
+            if (indoor._onDown && indoor.renderer) indoor.renderer.domElement.removeEventListener('mousedown', indoor._onDown);
+            if (indoor._onUp && indoor.renderer) indoor.renderer.domElement.removeEventListener('mouseup', indoor._onUp);
+            if (indoor._onResize) window.removeEventListener('resize', indoor._onResize);
+            if (indoor.controls) indoor.controls.dispose();
+            if (indoor.scene) {
+                indoor.scene.traverse(o => {
+                    if (o.geometry) o.geometry.dispose();
+                    if (o.material) { Array.isArray(o.material) ? o.material.forEach(m => m.dispose()) : o.material.dispose(); }
+                });
+            }
+            if (indoor.labelRenderer && indoor.labelRenderer.domElement && indoor.labelRenderer.domElement.parentNode) {
+                indoor.labelRenderer.domElement.parentNode.removeChild(indoor.labelRenderer.domElement);
+            }
+            if (indoor.renderer) indoor.renderer.dispose();
+            const cv = document.getElementById('indoorCanvas');
+            if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
+            indoor = {
+                active: false, scene: null, camera: null, renderer: null, labelRenderer: null,
+                controls: null, raycaster: null, mouse: null, floors: [], current: 0,
+                selected: null, nav: null, switchFloor: null, animId: null,
+                _onMove: null, _onClick: null, _onResize: null
+            };
+        }
+
+        // ===== 室内 3D 建模自定义（全局面板控制） =====
+        const _DEFAULT_INDOOR_CONFIG = { W: 140, D: 100, FH: 20, COLS: 8, ROWS: 6, atrium: true, labels: true, autoRotate: false, footprint: null };
+
+        function toggleCustomPanel() {
+            const p = document.getElementById('customPanel');
+            if (!p) return;
+            const opening = !p.classList.contains('open');
+            p.classList.toggle('open');
+            if (opening) {
+                syncCustomPanel();
+                // 温和引导：仅高亮「📖 教程」按钮提示，不弹出遮罩（避免遮挡 3D 编辑交互）
+                try {
+                    if (!localStorage.getItem('mallTutSeen')) {
+                        const btn = document.getElementById('customBtn');
+                        if (btn) { btn.classList.add('tut-pulse'); setTimeout(function () { btn.classList.remove('tut-pulse'); }, 3200); }
+                    }
+                } catch (e) {}
+            }
+        }
+        function syncCustomPanel() {
+            const set = (id, valId, v) => {
+                const el = document.getElementById(id), sp = document.getElementById(valId);
+                if (el) el.value = v; if (sp) sp.textContent = v;
+            };
+            set('cfgW', 'valW', indoorConfig.W);
+            set('cfgD', 'valD', indoorConfig.D);
+            set('cfgFH', 'valFH', indoorConfig.FH);
+            // 当前层覆盖（网格/中庭按层）
+            const fName = curFloorName();
+            const fc = (indoorEdit.floors[fName]) || {};
+            set('cfgCOLS', 'valCOLS', (typeof fc.COLS === 'number') ? fc.COLS : indoorConfig.COLS);
+            set('cfgROWS', 'valROWS', (typeof fc.ROWS === 'number') ? fc.ROWS : indoorConfig.ROWS);
+            const a = document.getElementById('cfgAtrium'); if (a) a.checked = (typeof fc.atrium === 'boolean') ? fc.atrium : indoorConfig.atrium;
+            const l = document.getElementById('cfgLabels'); if (l) l.checked = indoorConfig.labels;
+            const r = document.getElementById('cfgRotate'); if (r) r.checked = indoorConfig.autoRotate;
+            const fl = document.getElementById('cpEditFloor'); if (fl) fl.textContent = fName;
+            const hint = document.getElementById('cpFootprintHint');
+            if (hint) {
+                const bf = (indoorConfig.footprint && indoorConfig.footprint.length >= 3);
+                const ff = (fc.footprint && fc.footprint.length >= 3);
+                hint.textContent = (bf ? ('整栋轮廓：' + indoorConfig.footprint.length + ' 角点。') : '整栋为矩形(W×D)。')
+                    + (ff ? (' 本层「' + fName + '」有独立轮廓 ' + fc.footprint.length + ' 角点。') : (' 本层「' + fName + '」沿用整栋。'));
+            }
+            if (!window._customWired) {
+                window._customWired = true;
+                const live = (id, valId) => {
+                    const el = document.getElementById(id), sp = document.getElementById(valId);
+                    if (el) el.addEventListener('input', () => { if (sp) sp.textContent = el.value; });
+                };
+                live('cfgW', 'valW'); live('cfgD', 'valD'); live('cfgFH', 'valFH'); live('cfgCOLS', 'valCOLS'); live('cfgROWS', 'valROWS');
+                const rot = document.getElementById('cfgRotate');
+                if (rot) rot.addEventListener('change', () => { indoorConfig.autoRotate = rot.checked; if (indoor.controls) indoor.controls.autoRotate = rot.checked; });
+            }
+            syncEditModeUI();
+        }
+        function applyCustomConfig() {
+            const num = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : 0; };
+            const chk = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
+            indoorConfig.W = num('cfgW');
+            indoorConfig.D = num('cfgD');
+            indoorConfig.FH = num('cfgFH');
+            indoorConfig.labels = chk('cfgLabels');
+            indoorConfig.autoRotate = chk('cfgRotate');
+            // 当前层覆盖
+            const fName = curFloorName();
+            const fe = floorEdit(fName);
+            fe.COLS = Math.max(1, Math.round(num('cfgCOLS')));
+            fe.ROWS = Math.max(1, Math.round(num('cfgROWS')));
+            fe.atrium = chk('cfgAtrium');
+            updateStatus('已应用到「' + fName + '」层，正在重建 3D 场景…', 'success');
+            markQS('size');
+            rebuildIndoor();
+        }
+        function resetCustomConfig() {
+            indoorConfig = JSON.parse(JSON.stringify(_DEFAULT_INDOOR_CONFIG));
+            indoorEdit = { floors: {} };
+            syncCustomPanel();
+            updateStatus('已重置为默认建模参数', 'success');
+            markQS('size');
+            rebuildIndoor();
+        }
+        function rebuildIndoor() {
+            if (!indoor.active) return;
+            const name = indoor.mallName || (currentBuildingInfo && currentBuildingInfo.name) || '商场';
+            const keep = indoor.current || 0;
+            const ns = document.getElementById('hudNavSteps');
+            if (ns) { ns.style.display = 'none'; ns.innerHTML = ''; }
+            disposeIndoor();
+            const ld = document.getElementById('indoorLoading');
+            if (ld) ld.style.display = 'flex';
+            buildIndoorScene(name);
+            if (keep > 0 && indoor.switchFloor) indoor.switchFloor(keep);
+        }
+
+        // ===== 自由绘制建筑轮廓（墙体） =====
+        function startDrawFootprint() {
+            if (!indoor.active || !indoor.renderer) return;
+            if (drawState) endDrawFootprint();
+            drawTarget = 'building';
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // 地面 y=0
+            drawState = { points: [], markers: [], line: null, plane, downXY: null, handlers: null };
+            const dom = indoor.renderer.domElement;
+            const onDown = (e) => { if (drawState) drawState.downXY = [e.clientX, e.clientY]; };
+            const onUp = (e) => {
+                if (!drawState || !drawState.downXY) return;
+                const dx = e.clientX - drawState.downXY[0], dy = e.clientY - drawState.downXY[1];
+                drawState.downXY = null;
+                if (dx * dx + dy * dy > 36) return; // 拖拽（旋转视角）不算落点
+                addFootprintPoint(e);
+            };
+            dom.addEventListener('pointerdown', onDown);
+            dom.addEventListener('pointerup', onUp);
+            drawState.handlers = { onDown, onUp, dom };
+            updateStatus('绘制模式：在地面点击添加墙体角点（≥3 个），完成后点「完成轮廓」', 'loading');
+        }
+        function addFootprintPoint(e) {
+            if (!drawState || !indoor.raycaster) return;
+            const rect = indoor.renderer.domElement.getBoundingClientRect();
+            const m = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+            indoor.raycaster.setFromCamera(m, indoor.camera);
+            const hit = new THREE.Vector3();
+            if (!indoor.raycaster.ray.intersectPlane(drawState.plane, hit)) return;
+            drawState.points.push({ x: +hit.x.toFixed(1), z: +hit.z.toFixed(1) });
+            const mk = new THREE.Mesh(new THREE.SphereGeometry(2, 12, 12), new THREE.MeshBasicMaterial({ color: 0xffd166 }));
+            mk.position.set(hit.x, 0, hit.z);
+            indoor.scene.add(mk);
+            drawState.markers.push(mk);
+            updateFootprintPreview();
+        }
+        function updateFootprintPreview() {
+            if (!drawState) return;
+            if (drawState.line) { indoor.scene.remove(drawState.line); drawState.line.geometry.dispose(); drawState.line = null; }
+            if (drawState.points.length >= 2) {
+                const pts = drawState.points.map(p => new THREE.Vector3(p.x, 0.5, p.z));
+                pts.push(new THREE.Vector3(drawState.points[0].x, 0.5, drawState.points[0].z));
+                const g = new THREE.BufferGeometry().setFromPoints(pts);
+                drawState.line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xffd166 }));
+                indoor.scene.add(drawState.line);
+            }
+        }
+        function startDrawFloorFootprint() {
+            if (!indoor.active || !indoor.renderer) return;
+            if (drawState) endDrawFootprint();
+            drawTarget = 'floor';
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // 地面 y=0
+            drawState = { points: [], markers: [], line: null, plane, downXY: null, handlers: null };
+            const dom = indoor.renderer.domElement;
+            const onDown = (e) => { if (drawState) drawState.downXY = [e.clientX, e.clientY]; };
+            const onUp = (e) => {
+                if (!drawState || !drawState.downXY) return;
+                const dx = e.clientX - drawState.downXY[0], dy = e.clientY - drawState.downXY[1];
+                drawState.downXY = null;
+                if (dx * dx + dy * dy > 36) return;
+                addFootprintPoint(e);
+            };
+            dom.addEventListener('pointerdown', onDown);
+            dom.addEventListener('pointerup', onUp);
+            drawState.handlers = { onDown, onUp, dom };
+            updateStatus('绘制本层轮廓：在地面点击角点（≥3 个），完成后点「完成轮廓」', 'loading');
+        }
+        function finishDrawFootprint() {
+            if (!drawState) return;
+            const ok = drawState.points.length >= 3;
+            const fName = curFloorName();
+            if (ok) {
+                if (drawTarget === 'floor') {
+                    floorEdit(fName).footprint = drawState.points.slice();
+                    updateStatus('已应用「' + fName + '」层轮廓（' + drawState.points.length + ' 角点），重建中…', 'success');
+                } else {
+                    indoorConfig.footprint = drawState.points.slice();
+                    updateStatus('已应用整栋轮廓（' + indoorConfig.footprint.length + ' 个角点），重建中…', 'success');
+                }
+            } else {
+                updateStatus('轮廓至少需要 3 个角点，已取消绘制', 'error');
+            }
+            endDrawFootprint();
+            if (ok) rebuildIndoor();
+        }
+        function cancelDrawFootprint() {
+            endDrawFootprint();
+            rebuildIndoor();
+        }
+        function resetFootprintRect() {
+            indoorConfig.footprint = null;
+            updateStatus('已重置为整栋矩形建筑', 'success');
+            rebuildIndoor();
+        }
+        function resetFloorFootprintRect() {
+            const fe = indoorEdit.floors[curFloorName()];
+            if (fe) { delete fe.footprint; }
+            updateStatus('已重置「' + curFloorName() + '」层为整栋轮廓', 'success');
+            rebuildIndoor();
+        }
+        function endDrawFootprint() {
+            if (!drawState) return;
+            const h = drawState.handlers;
+            if (h) { h.dom.removeEventListener('mousedown', h.onDown); h.dom.removeEventListener('mouseup', h.onUp); }
+            drawState.markers.forEach(m => { if (indoor.scene) indoor.scene.remove(m); });
+            if (drawState.line && indoor.scene) indoor.scene.remove(drawState.line);
+            if (indoor.controls) indoor.controls.enabled = true;
+            drawState = null;
+        }
+
+        // ===== 室内编辑工具（自由建墙 / 编辑店铺 / 放设施） =====
+        function clearWallDraft() {
+            editWallPtMarks.forEach(m => { if (indoor.scene) indoor.scene.remove(m); });
+            editWallPtMarks = [];
+            editWallPts = [];
+            if (indoor.wallPreviewLine) { indoor.scene.remove(indoor.wallPreviewLine); indoor.wallPreviewLine.geometry.dispose(); indoor.wallPreviewLine = null; }
+        }
+        function setEditMode(mode) {
+            editMode = (mode === '') ? null : mode;
+            if (editMode !== 'wall') clearWallDraft();
+            document.body.classList.toggle('editing-mode', !!editMode);
+            if (indoor.controls) indoor.controls.enabled = true;
+            syncEditModeUI();
+            const hint = document.getElementById('editHint');
+            if (hint) {
+                hint.classList.add('enh');
+                const enh = {
+                    '': '👁 <b>浏览模式</b>：拖拽旋转 · 滚轮缩放 · 悬停查看 · 点击选中店铺。',
+                    'wall': '🧱 <b>加内墙</b>：在地面依次点两点连一段墙，可继续添加。<span class="next">下一步：点击已有墙可删除，或用「撤销一段 / 清空本层」。</span>',
+                    'shop': '🏬 <b>编辑店铺</b>：点选后<b>按住拖动</b>移动；右侧改色 / 新增 / 删除 / 复位。<span class="next">下一步：试试把店铺改成餐饮色 🟧。</span>',
+                    'facility': '🛗 <b>放设施</b>：选类型后在地面点击放置；点击已有设施可删除。<span class="next">下一步：切换楼层后设施按层独立保存。</span>'
+                };
+                hint.innerHTML = enh[editMode] || '';
+            }
+            updateStatus('编辑模式：' + (editMode || '浏览'), 'loading');
+        }
+        function setFacilityType(t) {
+            editFacilityType = t;
+            document.querySelectorAll('#editFacilityTools .sw-fac').forEach(b => b.classList.toggle('active', b.dataset.fac === t));
+        }
+        function syncEditModeUI() {
+            const row = document.getElementById('editModeRow');
+            if (row) Array.from(row.children).forEach(b => b.classList.toggle('active', b.dataset.mode === (editMode || '')));
+            const st = document.getElementById('editShopTools'); if (st) st.style.display = (editMode === 'shop') ? 'block' : 'none';
+            const wt = document.getElementById('editWallTools'); if (wt) wt.style.display = (editMode === 'wall') ? 'block' : 'none';
+            const ft = document.getElementById('editFacilityTools'); if (ft) ft.style.display = (editMode === 'facility') ? 'block' : 'none';
+        }
+        function addShopHere() {
+            const fName = curFloorName();
+            const fe = floorEdit(fName);
+            fe.customShops = fe.customShops || [];
+            const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
+            const bbox = fl ? fl.bbox : { minX: -indoorConfig.W / 2, maxX: indoorConfig.W / 2, minZ: -indoorConfig.D / 2, maxZ: indoorConfig.D / 2 };
+            const id = 'c' + Date.now();
+            fe.customShops.push({ id, name: '新店铺', cat: 'shopping', x: 0, z: 0, w: 12, d: 12 });
+            updateStatus('已新增店铺（拖拽可移动，右侧可改色）', 'success');
+            rebuildIndoor();
+        }
+        function deleteSelectedShop() {
+            if (!editSelShopId) { updateStatus('请先点选一个店铺', 'error'); return; }
+            const fName = curFloorName();
+            const fe = floorEdit(fName);
+            fe.shopOverrides = fe.shopOverrides || {};
+            // 网格店：标记删除；自定义店：移除
+            const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
+            const entry = fl ? fl.shops.find(s => s.data.id === editSelShopId) : null;
+            if (entry && entry.data.id && entry.data.id.charAt(0) === 'c') {
+                if (fe.customShops) fe.customShops = fe.customShops.filter(s => s.id !== editSelShopId);
+            } else {
+                fe.shopOverrides[editSelShopId] = { deleted: true };
+            }
+            editSelShopId = null;
+            updateStatus('已删除选中店铺', 'success');
+            rebuildIndoor();
+        }
+        function undoSelectedShop() {
+            if (!editSelShopId) { updateStatus('请先点选一个店铺', 'error'); return; }
+            const fe = floorEdit(curFloorName());
+            if (fe.shopOverrides) delete fe.shopOverrides[editSelShopId];
+            editSelShopId = null;
+            updateStatus('已复位选中店铺到默认位置/品类', 'success');
+            rebuildIndoor();
+        }
+        function recolorSelectedShop(cat) {
+            if (!editSelShopId) { updateStatus('请先点选一个店铺', 'error'); return; }
+            const fe = floorEdit(curFloorName());
+            fe.shopOverrides = fe.shopOverrides || {};
+            const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
+            const entry = fl ? fl.shops.find(s => s.data.id === editSelShopId) : null;
+            const name = entry ? entry.data.name : null;
+            // 保留当前位置，避免重建时坐标缺失导致店铺消失
+            const x = entry ? entry.mesh.position.x : undefined;
+            const z = entry ? entry.mesh.position.z : undefined;
+            fe.shopOverrides[editSelShopId] = { cat: cat, name: name, x: x, z: z };
+            updateStatus('已改为' + CAT_META[cat].label + '色', 'success');
+            rebuildIndoor();
+        }
+        function undoLastWall() {
+            const fe = floorEdit(curFloorName());
+            if (fe.walls && fe.walls.length) { fe.walls.pop(); updateStatus('已撤销一段内墙', 'success'); rebuildIndoor(); }
+            else updateStatus('本层没有可撤销的墙', 'error');
+        }
+        function clearFloorWalls() {
+            const fe = floorEdit(curFloorName());
+            fe.walls = [];
+            updateStatus('已清空本层内墙', 'success');
+            rebuildIndoor();
+        }
+
+        // 页面加载完成后初始化地图
+        window.addEventListener('load', function() {
+            setTimeout(initMap, 500);
+        });
+
+        // ===== 教程与快速开始（自定义建模易用性增强） =====
+        const TUT_STEPS = [
+            { n: '进入自定义建模', body: '点击顶部 <b>📖 教程</b> 或 <b>⚙ 自定义</b> 打开右侧建模面板。若尚未进入 3D 漫游，请先在室外地图点击 <b>商场标注</b> 进入室内模式。' },
+            { n: '调整整体尺寸', body: '拖动 <b>建筑宽度 / 深度 / 楼层高度 / 店铺网格</b> 滑块，点 <code>应用并重建</code> 即可改变整栋外形与店铺数量。' },
+            { n: '加内墙隔断', body: '点 <b>🧱 加内墙</b>，在地面依次点击 <b>两点</b> 连成一段墙，可继续添加。<b>点击已有墙</b> 可删除，或用「撤销一段 / 清空本层」。' },
+            { n: '编辑店铺', body: '点 <b>🏬 编辑店铺</b>，点选一个店铺后 <b>按住拖动</b> 可移动；右侧选 4 种颜色改品类，或 <b>新增 / 删除 / 复位</b>。' },
+            { n: '放置设施', body: '点 <b>🛗 放设施</b>，选好类型（电梯/扶梯/楼梯/喷泉）后在地面点击放置；<b>点击已有设施</b> 可删除。' },
+            { n: '自由绘制轮廓', body: '点 <b>✏️ 整栋轮廓</b> 或 <b>✏️ 本层轮廓</b>，在地面点击 <b>≥3 个角点</b> 连成闭合多边形，再点 <b>✅ 完成轮廓</b> 改变建筑外形（店铺按轮廓裁剪）。' },
+            { n: '逐层独立编辑', body: '用右侧 <b>楼层控制器</b> 切换其他层，尺寸/网格/轮廓/店铺都 <b>按层独立保存</b>，互不影响。' },
+            { n: '实时查看与导航', body: '全部编辑实时反映在 3D 场景。切回 <b>👁 浏览</b> 模式，点击店铺查看详情并 <b>🧭 导航到这里</b>。' },
+            { n: '退出与保存', body: '编辑结果保存在本会话。点 <b>← 返回地图</b> 退出 3D；随时点顶部 <b>📖 教程</b> 回看本指南。' }
+        ];
+        let _tutIdx = 0;
+        function openTutorial() {
+            _tutIdx = 0; renderTutorial();
+            const ov = document.getElementById('tutOverlay'); if (ov) ov.classList.add('show');
+        }
+        function renderTutorial() {
+            const s = TUT_STEPS[_tutIdx];
+            document.getElementById('tutStepN').textContent = '第 ' + (_tutIdx + 1) + ' / ' + TUT_STEPS.length + ' 步 · ' + s.n;
+            document.getElementById('tutBody').innerHTML = s.body;
+            document.getElementById('tutBar').style.width = Math.round((_tutIdx + 1) / TUT_STEPS.length * 100) + '%';
+            const prev = document.getElementById('tutPrev'); if (prev) prev.style.visibility = (_tutIdx === 0) ? 'hidden' : 'visible';
+            const next = document.getElementById('tutNext'); if (next) next.textContent = (_tutIdx === TUT_STEPS.length - 1) ? '完成' : '下一步';
+        }
+        function tutNext() { if (_tutIdx < TUT_STEPS.length - 1) { _tutIdx++; renderTutorial(); } else closeTutorial(); }
+        function tutPrev() { if (_tutIdx > 0) { _tutIdx--; renderTutorial(); } }
+        function closeTutorial() {
+            const ov = document.getElementById('tutOverlay'); if (ov) ov.classList.remove('show');
+            try { localStorage.setItem('mallTutSeen', '1'); } catch (e) {}
+        }
+        const QS_INDEX = { size: 0, wall: 1, shop: 2, fac: 3, foot: 4 };
+        function toggleQS() {
+            const l = document.getElementById('qsList'); if (!l) return;
+            const hidden = l.style.display === 'none';
+            l.style.display = hidden ? 'block' : 'none';
+            const t = document.getElementById('qsToggle'); if (t) t.textContent = hidden ? '收起 ▾' : '展开 ▸';
+        }
+        function markQS(step) {
+            const i = QS_INDEX[step]; if (typeof i !== 'number') return;
+            const items = document.querySelectorAll('#qsList .qs-item');
+            if (items[i]) { items[i].classList.add('done'); const c = items[i].querySelector('.qs-check'); if (c) c.textContent = '✓'; }
+        }
+        function flashEl(el) {
+            if (!el) return;
+            el.classList.add('flash-ring');
+            setTimeout(function () { el.classList.remove('flash-ring'); }, 1200);
+        }
+        function qsGo(step) {
+            const cp = document.getElementById('customPanel');
+            if (cp && !cp.classList.contains('open')) toggleCustomPanel();
+            if (step === 'size') {
+                const el = document.getElementById('cfgW'); if (el) { el.scrollIntoView({ block: 'center' }); flashEl(el.parentElement); }
+                markQS('size');
+            } else if (step === 'wall') { setEditMode('wall'); markQS('wall'); }
+            else if (step === 'shop') { setEditMode('shop'); markQS('shop'); }
+            else if (step === 'fac') { setEditMode('facility'); markQS('fac'); }
+            else if (step === 'foot') { startDrawFootprint(); markQS('foot'); }
+        }
+    </script>
+
+    <!-- 教程浮层 -->
+    <div class="tut-overlay" id="tutOverlay" onclick="if(event.target===this)closeTutorial()">
+        <div class="tut-box">
+            <div class="tut-title">📖 3D 建模自定义 · 新手教程</div>
+            <div class="tut-progress"><i id="tutBar"></i></div>
+            <div class="tut-step-n" id="tutStepN">第 1 / 9 步</div>
+            <div class="tut-step-body" id="tutBody"></div>
+            <div class="tut-nav">
+                <button class="tut-skip" onclick="closeTutorial()">跳过</button>
+                <button id="tutPrev" onclick="tutPrev()">上一步</button>
+                <button class="primary" id="tutNext" onclick="tutNext()">下一步</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

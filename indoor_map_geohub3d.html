@@ -1,0 +1,3566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>室内地图 · 3D 真实建模版</title>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_KEY_HERE&plugin=YOUR_AMAP_SECURITY_CODE"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: #06060f;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ── */
+        .hdr {
+            height: 52px;
+            flex-shrink: 0;
+            background: rgba(6,6,15,.95);
+            border-bottom: 1px solid rgba(255,255,255,.06);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 12px;
+            backdrop-filter: blur(12px);
+            z-index: 100;
+        }
+        .hdr-title { font-size: 14px; font-weight: 700; background: linear-gradient(90deg,#00d4ff,#a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hdr-sep { width: 1px; height: 20px; background: rgba(255,255,255,.08); }
+        .hdr-sub { font-size: 11px; color: #6b7280; }
+        .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+        /* ── Main layout ── */
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ── Left sidebar ── */
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            background: rgba(6,6,15,.97);
+            border-right: 1px solid rgba(255,255,255,.06);
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 50;
+        }
+        .sidebar::-webkit-scrollbar { width: 3px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
+
+        /* ── Map area ── */
+        .map-area {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #map {
+            position: absolute;
+            inset: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        #threeCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: 10;
+        }
+        #threeCanvas.active { pointer-events: all; }
+
+        /* ── Status bar ── */
+        #statusEl {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            padding: 8px 16px;
+            border-radius: 24px;
+            font-size: 12px;
+            background: rgba(6,6,15,.88);
+            border: 1px solid rgba(255,255,255,.08);
+            backdrop-filter: blur(10px);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.4s;
+        }
+        #statusEl.fade { opacity: 0; pointer-events: none; }
+        .spinner { display:inline-block;width:10px;height:10px;border:2px solid rgba(255,255,255,.15);border-top-color:#fbbf24;border-radius:50%;animation:spin .7s linear infinite; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+
+        /* ── Cards ── */
+        .card {
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.06);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .card-title { font-size: 11px; font-weight: 700; color: #9ca3af; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; text-transform: uppercase; letter-spacing: .5px; }
+        .card-title span { font-size: 13px; }
+
+        /* ── Buttons ── */
+        .btn { border: none; border-radius: 7px; padding: 8px 14px; font-size: 12px; cursor: pointer; transition: all .2s; font-family: inherit; }
+        .btn-primary { background: linear-gradient(135deg,#00d4ff,#0077ff); color: #fff; font-weight: 700; }
+        .btn-primary:hover { opacity: .85; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,212,255,.3); }
+        .btn-ghost { background: rgba(255,255,255,.06); color: #d1d5db; border: 1px solid rgba(255,255,255,.1); }
+        .btn-ghost:hover { background: rgba(255,255,255,.1); }
+        .btn-orange { background: rgba(251,146,60,.15); color: #fb923c; border: 1px solid rgba(251,146,60,.25); }
+        .btn-orange:hover { background: rgba(251,146,60,.25); }
+
+        /* ── Mode buttons ── */
+        .mode-row { display: flex; gap: 4px; }
+        .mode-btn { flex: 1; padding: 7px 4px; border-radius: 7px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.04); color: #6b7280; font-size: 11px; cursor: pointer; transition: all .2s; font-family: inherit; text-align: center; }
+        .mode-btn:hover { background: rgba(255,255,255,.08); color: #d1d5db; }
+        .mode-btn.active { background: rgba(0,212,255,.15); color: #00d4ff; border-color: rgba(0,212,255,.4); font-weight: 700; }
+
+        /* ── Angle buttons ── */
+        .angle-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
+        .angle-btn { padding: 6px 2px; border-radius: 5px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); color: #6b7280; font-size: 10px; text-align: center; cursor: pointer; transition: all .2s; font-family: inherit; }
+        .angle-btn:hover { background: rgba(168,85,247,.15); color: #a855f7; border-color: rgba(168,85,247,.3); }
+        .angle-btn.active { background: rgba(168,85,247,.2); color: #a855f7; border-color: #a855f7; }
+
+        /* ── Floor chips ── */
+        .floor-scroll { display: flex; flex-direction: column; gap: 3px; max-height: 220px; overflow-y: auto; }
+        .floor-chip { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); cursor: pointer; transition: all .2s; }
+        .floor-chip:hover { background: rgba(255,255,255,.08); }
+        .floor-chip.active { background: rgba(0,212,255,.12); border-color: rgba(0,212,255,.4); }
+        .floor-chip .f-icon { font-size: 14px; }
+        .floor-chip .f-name { font-size: 12px; color: #d1d5db; }
+        .floor-chip.active .f-name { color: #00d4ff; font-weight: 700; }
+        .floor-chip .f-count { margin-left: auto; font-size: 10px; color: #6b7280; background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 10px; }
+        .floor-chip.active .f-count { background: rgba(0,212,255,.15); color: #00d4ff; }
+
+        /* ── Floor quick buttons ── */
+        .fc-row { display: flex; gap: 3px; margin-top: 4px; }
+        .fc-btn { flex: 1; padding: 4px 2px; border-radius: 5px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); color: #6b7280; font-size: 10px; cursor: pointer; transition: all .15s; font-family: inherit; }
+        .fc-btn:hover { background: rgba(255,255,255,.08); }
+        .fc-btn.active { background: rgba(0,212,255,.15); color: #00d4ff; border-color: rgba(0,212,255,.4); }
+
+        /* ── Mall search ── */
+        .mall-search-row { display: flex; margin-bottom: 2px; }
+        .mall-results {
+            max-height: 200px; overflow-y: auto; border-radius: 8px;
+            background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.08);
+        }
+        .mall-result-item {
+            padding: 8px 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,.04);
+            transition: background .15s;
+        }
+        .mall-result-item:last-child { border-bottom: none; }
+        .mall-result-item:hover { background: rgba(0,212,255,.08); }
+        .mall-result-name { font-size: 12px; color: #e5e7eb; font-weight: 600; }
+        .mall-result-addr { font-size: 10px; color: #6b7280; margin-top: 2px; }
+        .mall-result-tag {
+            display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 4px;
+            background: rgba(0,212,255,.12); color: #00d4ff; margin-top: 3px;
+        }
+        .mall-loading { font-size: 11px; color: #6b7280; text-align: center; padding: 8px; }
+
+        /* ── Mall search source toggle ── */
+        .src-toggle { display: flex; width: 100%; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); border-radius: 7px; overflow: hidden; }
+        .src-btn { flex: 1; padding: 6px 4px; background: transparent; border: none; color: #6b7280; font-size: 11px; cursor: pointer; font-family: inherit; transition: all .15s; }
+        .src-btn:hover { color: #d1d5db; }
+        .src-btn.active { background: rgba(0,212,255,.15); color: #00d4ff; font-weight: 700; }
+
+        /* ── Header editor toggle ── */
+        .hdr-btn {
+            padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,.1);
+            background: rgba(255,255,255,.05); color: #9ca3af; font-size: 11px;
+            cursor: pointer; transition: all .2s; font-family: inherit;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .hdr-btn:hover { background: rgba(0,212,255,.12); border-color: rgba(0,212,255,.3); color: #00d4ff; }
+        .hdr-btn.active { background: rgba(0,212,255,.15); border-color: rgba(0,212,255,.5); color: #00d4ff; }
+
+        /* ── Map shift when editor open ── */
+        body.editor-open .sidebar { display: none; }
+        body.editor-open .map-area { margin-left: 0; }
+
+        /* ── Modeling editor panel ── */
+        #edPanel {
+            position: fixed; top: 52px; right: 0; bottom: 0; width: 320px;
+            background: rgba(6,6,15,.97); border-left: 1px solid rgba(255,255,255,.08);
+            z-index: 300; display: flex; flex-direction: column;
+            transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+            overflow: hidden;
+        }
+        #edPanel.open { transform: translateX(0); }
+        .ed-hdr {
+            display: flex; align-items: center; padding: 10px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.06); gap: 8px; flex-shrink: 0;
+        }
+        .ed-hdr-title { font-size: 12px; font-weight: 700; color: #00d4ff; flex: 1; }
+        .ed-hdr-floor { display: flex; align-items: center; gap: 4px; }
+        .ed-hdr-floor select {
+            background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+            color: #fff; font-size: 11px; border-radius: 5px; padding: 3px 6px; font-family: inherit;
+        }
+        .ed-close {
+            width: 24px; height: 24px; border-radius: 5px; border: 1px solid rgba(255,255,255,.1);
+            background: rgba(255,255,255,.04); color: #9ca3af; font-size: 12px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all .15s; font-family: inherit;
+        }
+        .ed-close:hover { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.3); color: #ef4444; }
+
+        /* ── Editor toolbar ── */
+        .ed-toolbar {
+            padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,.05);
+            display: flex; gap: 5px; flex-wrap: wrap; flex-shrink: 0;
+        }
+        .ed-tool {
+            width: 34px; height: 34px; border-radius: 7px;
+            border: 1px solid rgba(255,255,255,.08);
+            background: rgba(255,255,255,.04);
+            color: #9ca3af; font-size: 14px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all .15s; position: relative; font-family: inherit;
+        }
+        .ed-tool:hover { background: rgba(255,255,255,.08); color: #fff; }
+        .ed-tool.active {
+            background: rgba(0,212,255,.15);
+            border-color: rgba(0,212,255,.5);
+            color: #00d4ff;
+        }
+        .ed-tool.seg-active {
+            background: rgba(168,85,247,.15);
+            border-color: rgba(168,85,247,.5);
+            color: #a855f7;
+        }
+        .ed-tool-title { font-size: 9px; color: #6b7280; text-align: center; margin-top: 2px; }
+        .ed-sep { width: 1px; height: 34px; background: rgba(255,255,255,.06); margin: 0 2px; }
+
+        /* ── Editor tabs ── */
+        .ed-tabs {
+            display: flex; border-bottom: 1px solid rgba(255,255,255,.06); flex-shrink: 0;
+        }
+        .ed-tab {
+            flex: 1; padding: 8px 4px; text-align: center; font-size: 11px; color: #6b7280;
+            cursor: pointer; transition: all .15s; border-bottom: 2px solid transparent;
+            font-family: inherit; background: none; border-top: none; border-left: none; border-right: none;
+        }
+        .ed-tab:hover { color: #9ca3af; }
+        .ed-tab.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+        .ed-tab-content { display: none; flex: 1; overflow-y: auto; padding: 10px 12px; }
+        .ed-tab-content.active { display: flex; flex-direction: column; gap: 8px; }
+
+        /* ── Draw canvas ── */
+        #edCanvas {
+            position: fixed; top: 52px; left: 280px; right: 0; bottom: 0;
+            z-index: 250; pointer-events: none;
+        }
+        #edCanvas.draw-active { pointer-events: all; cursor: crosshair; }
+
+        /* ── Draw status ── */
+        .ed-status {
+            font-size: 10px; color: #00d4ff; background: rgba(0,212,255,.1);
+            border: 1px solid rgba(0,212,255,.2); border-radius: 5px;
+            padding: 4px 8px; text-align: center;
+        }
+        .ed-status.warn { color: #fbbf24; background: rgba(251,191,36,.1); border-color: rgba(251,191,36,.2); }
+
+        /* ── Editor form rows ── */
+        .ed-row { display: flex; align-items: center; gap: 8px; }
+        .ed-lbl { font-size: 11px; color: #6b7280; width: 52px; flex-shrink: 0; }
+        .ed-input {
+            flex: 1; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+            border-radius: 6px; color: #fff; font-size: 11px; padding: 5px 8px;
+            outline: none; font-family: inherit;
+        }
+        .ed-input:focus { border-color: rgba(0,212,255,.4); }
+        .ed-color {
+            width: 32px; height: 26px; border-radius: 5px; border: 1px solid rgba(255,255,255,.1);
+            cursor: pointer; padding: 0; background: none; overflow: hidden;
+        }
+        .ed-color::-webkit-color-swatch-wrapper { padding: 0; }
+        .ed-color::-webkit-color-swatch { border: none; border-radius: 4px; }
+        .ed-range { flex: 1; accent-color: #00d4ff; }
+
+        /* ── Editor list ── */
+        .ed-list { display: flex; flex-direction: column; gap: 4px; }
+        .ed-item {
+            display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+            border-radius: 7px; background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.05); cursor: pointer;
+            transition: all .15s;
+        }
+        .ed-item:hover { background: rgba(255,255,255,.06); }
+        .ed-item.selected { background: rgba(0,212,255,.08); border-color: rgba(0,212,255,.25); }
+        .ed-item-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .ed-item-name { flex: 1; font-size: 11px; color: #d1d5db; }
+        .ed-item-meta { font-size: 10px; color: #6b7280; }
+        .ed-item-del {
+            width: 20px; height: 20px; border-radius: 4px; border: none;
+            background: rgba(239,68,68,.1); color: #ef4444; font-size: 10px;
+            cursor: pointer; opacity: 0; transition: opacity .15s; font-family: inherit;
+        }
+        .ed-item:hover .ed-item-del { opacity: 1; }
+
+        /* ── Editor actions ── */
+        .ed-actions { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; padding: 8px 12px; border-top: 1px solid rgba(255,255,255,.06); }
+        .ed-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 10px; padding: 2px 6px; border-radius: 10px;
+            background: rgba(0,212,255,.1); color: #00d4ff;
+            border: 1px solid rgba(0,212,255,.2);
+        }
+
+        /* ── Floor manager ── */
+        .ed-fl-list { display: flex; flex-direction: column; gap: 5px; }
+        .ed-fl-item {
+            display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+            border-radius: 8px; background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.06); cursor: pointer; transition: all .15s;
+        }
+        .ed-fl-item:hover { background: rgba(255,255,255,.06); }
+        .ed-fl-item.active { background: rgba(0,212,255,.08); border-color: rgba(0,212,255,.3); }
+        .ed-fl-color { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+        .ed-fl-name { flex: 1; font-size: 11px; color: #d1d5db; }
+        .ed-fl-n { font-size: 10px; color: #6b7280; }
+
+        /* ── POI category pills ── */
+        .cat-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+        .cat-pill {
+            font-size: 10px; padding: 3px 8px; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.1); color: #9ca3af;
+            cursor: pointer; transition: all .15s; font-family: inherit;
+        }
+        .cat-pill:hover { background: rgba(255,255,255,.05); }
+        .cat-pill.active { color: #fff; }
+
+        /* ── Help tooltip ── */
+        .ed-help {
+            font-size: 10px; color: #6b7280; line-height: 1.7;
+            background: rgba(255,255,255,.03); border-radius: 6px;
+            padding: 8px 10px; border: 1px solid rgba(255,255,255,.05);
+        }
+        .ed-help strong { color: #9ca3af; }
+
+        /* ── Preview mini ── */
+        .ed-preview-hint {
+            font-size: 10px; color: #6b7280; text-align: center;
+            padding: 6px; border-radius: 6px; background: rgba(255,255,255,.03);
+            border: 1px dashed rgba(255,255,255,.08);
+        }
+
+        /* ── Search ── */
+        .search-row { display: flex; gap: 5px; }
+        .s-input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: #fff; font-size: 12px; padding: 7px 10px; outline: none; font-family: inherit; }
+        .s-input:focus { border-color: rgba(0,212,255,.4); }
+        .s-input::placeholder { color: #4b5563; }
+        .s-btn { width: 36px; border-radius: 7px; border: none; background: rgba(255,255,255,.08); color: #9ca3af; font-size: 12px; cursor: pointer; transition: all .2s; flex-shrink: 0; }
+        .s-btn:hover { background: rgba(0,212,255,.2); color: #00d4ff; }
+        .results { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; max-height: 180px; overflow-y: auto; }
+        .res-item { padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); cursor: pointer; transition: all .15s; }
+        .res-item:hover { background: rgba(0,212,255,.08); border-color: rgba(0,212,255,.3); }
+        .res-name { font-size: 11px; color: #d1d5db; font-weight: 600; }
+        .res-meta { font-size: 10px; color: #6b7280; margin-top: 1px; }
+
+        /* ── Legend ── */
+        .legend { display: flex; flex-wrap: wrap; gap: 5px 10px; }
+        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #6b7280; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        /* ── POI tooltip ── */
+        #poiInfo {
+            position: absolute;
+            bottom: 72px;
+            left: 50%;
+            transform: translateX(-50%) translateY(12px);
+            background: rgba(6,6,15,.94);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 12px;
+            padding: 12px 16px;
+            min-width: 200px;
+            z-index: 200;
+            backdrop-filter: blur(12px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all .35s cubic-bezier(.4,0,.2,1);
+        }
+        #poiInfo.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .pi-name { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+        .pi-addr { font-size: 11px; color: #9ca3af; }
+        .pi-tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+        .pi-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,.08); color: #9ca3af; }
+
+        /* ── Nav path info ── */
+        #navInfo {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(6,6,15,.9);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 10px;
+            padding: 8px 16px;
+            z-index: 200;
+            backdrop-filter: blur(10px);
+            font-size: 12px;
+            color: #d1d5db;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        #navInfo.show { display: flex; }
+        #navInfo button { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 14px; padding: 0 4px; }
+        #navInfo button:hover { color: #f87171; }
+
+        /* ── 3D building params ── */
+        .bld-params { display: flex; flex-direction: column; gap: 5px; }
+        .bld-row { display: flex; align-items: center; gap: 6px; }
+        .bld-lbl { font-size: 10px; color: #6b7280; min-width: 40px; flex-shrink: 0; }
+        .bld-val { font-size: 11px; color: #00d4ff; margin-left: auto; font-variant-numeric: tabular-nums; }
+        input[type="range"].bld-range { flex: 1; accent-color: #00d4ff; height: 3px; }
+
+        /* ── Key guide ── */
+        #keyGuide {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.75);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(6px);
+        }
+        .kg-box {
+            background: rgba(15,15,30,.97);
+            border: 1px solid rgba(0,212,255,.2);
+            border-radius: 16px;
+            padding: 28px 32px;
+            max-width: 480px;
+            width: 90%;
+        }
+        .kg-box h2 { font-size: 16px; color: #00d4ff; margin-bottom: 12px; }
+        .kg-box p { font-size: 12px; color: #9ca3af; line-height: 1.7; margin-bottom: 10px; }
+        .kg-box code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; font-size: 11px; color: #fb923c; }
+        .kg-box pre { background: rgba(0,0,0,.4); border-radius: 8px; padding: 12px; font-size: 11px; color: #d1d5db; margin: 10px 0; line-height: 1.7; overflow-x: auto; }
+        .kg-box .btn { margin-top: 12px; width: 100%; }
+
+        /* ── View mode pill ── */
+        #modePill {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 100;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(6,6,15,.8);
+            border: 1px solid rgba(255,255,255,.1);
+            backdrop-filter: blur(8px);
+            pointer-events: none;
+        }
+        #modePill.amap { color: #00d4ff; border-color: rgba(0,212,255,.3); }
+        #modePill.three { color: #a855f7; border-color: rgba(168,85,247,.3); }
+        #modePill.fusion { color: #4ade80; border-color: rgba(74,222,128,.3); }
+
+        /* ── Hint arrow ── */
+        .hint-arrow {
+            display: inline-block;
+            margin-left: 4px;
+            color: #00d4ff;
+            font-size: 10px;
+            animation: bounce 1.5s ease-in-out infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        /* ── URL input ── */
+        .url-input-group { margin-bottom: 8px; }
+        .url-input-group label { font-size: 10px; color: #6b7280; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
+        .url-input { width: 100%; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: #fff; font-size: 11px; padding: 7px 10px; outline: none; font-family: inherit; }
+        .url-input:focus { border-color: rgba(0,212,255,.4); }
+        .url-input::placeholder { color: #374151; }
+
+        /* ── Upload zone ── */
+        .upload-zone {
+            border: 2px dashed rgba(255,255,255,.1);
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+            margin-top: 6px;
+        }
+        .upload-zone:hover { border-color: rgba(0,212,255,.4); background: rgba(0,212,255,.04); }
+        .upload-zone .icon { font-size: 20px; margin-bottom: 4px; }
+        .upload-zone .text { font-size: 12px; color: #9ca3af; }
+        .upload-zone .sub { font-size: 10px; color: #4b5563; margin-top: 2px; }
+
+        /* ── Tip box ── */
+        .tip-box { background: rgba(251,191,36,.06); border: 1px solid rgba(251,191,36,.15); border-radius: 7px; padding: 8px 10px; font-size: 11px; color: #fbbf24; line-height: 1.6; margin-top: 6px; }
+        .tip-box strong { display: block; margin-bottom: 2px; }
+        .tip-box code { background: rgba(0,0,0,.3); padding: 1px 5px; border-radius: 3px; }
+
+        /* ── bld quick select ── */
+        .bld-list { display: flex; flex-direction: column; gap: 3px; }
+        .bld-item { padding: 6px 8px; border-radius: 7px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); cursor: pointer; transition: all .15s; }
+        .bld-item:hover { background: rgba(0,212,255,.08); border-color: rgba(0,212,255,.3); }
+        .bld-item h5 { font-size: 11px; color: #d1d5db; font-weight: 600; }
+        .bld-item p { font-size: 10px; color: #6b7280; margin-top: 1px; }
+        .bld-item.active { background: rgba(0,212,255,.1); border-color: rgba(0,212,255,.4); }
+        .bld-item.active h5 { color: #00d4ff; }
+
+        /* ── Section ── */
+        .section { font-size: 10px; color: #4b5563; text-transform: uppercase; letter-spacing: .5px; padding: 4px 0 2px; font-weight: 700; }
+
+        /* ── Nav: clear nav ── */
+        .nav-ctrl { display: flex; gap: 4px; margin-top: 6px; }
+
+        /* ── Tutorial button (header) ── */
+        .hdr-btn.tut { background: rgba(168,85,247,.14); border-color: rgba(168,85,247,.4); color: #c4b5fd; }
+        .hdr-btn.tut:hover { background: rgba(168,85,247,.24); }
+
+        /* ── Quick start guide ── */
+        .ed-quickstart { margin: 8px 12px 0; border: 1px solid rgba(0,212,255,.2); border-radius: 10px; background: rgba(0,212,255,.05); overflow: hidden; flex-shrink: 0; }
+        .ed-qs-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; user-select: none; }
+        .ed-qs-head .ic { font-size: 13px; }
+        .ed-qs-head .t { font-size: 11px; font-weight: 700; color: #00d4ff; }
+        .ed-qs-head .s { margin-left: auto; font-size: 10px; color: #6b7280; }
+        .ed-qs-steps { display: flex; flex-direction: column; gap: 3px; padding: 4px 8px 10px; }
+        .ed-qs-step { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px; cursor: pointer; transition: all .15s; font-size: 11px; color: #cbd5e1; }
+        .ed-qs-step:hover { background: rgba(0,212,255,.1); }
+        .ed-qs-step .n { width: 19px; height: 19px; border-radius: 50%; background: rgba(0,212,255,.2); color: #00d4ff; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; }
+        .ed-qs-step.done .n { background: #10b981; color: #06281c; }
+        .ed-qs-step.done .n::after { content: '✓'; }
+        .ed-qs-step.done .n span { display: none; }
+        .ed-qs-step .d { color: #6b7280; font-size: 10px; margin-left: auto; }
+        .ed-quickstart.collapsed .ed-qs-steps { display: none; }
+
+        /* ── Status bar boost ── */
+        .ed-status { font-size: 11px; line-height: 1.55; padding: 6px 10px; }
+        .ed-status b { color: #00d4ff; }
+        .ed-status .next { display: block; margin-top: 4px; color: #fbbf24; font-size: 10px; }
+        .ed-status.ok { color: #34d399; background: rgba(52,211,153,.1); border-color: rgba(52,211,153,.25); }
+        .ed-status .kbd { display: inline-block; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; font-size: 9px; margin: 0 1px; }
+
+        /* ── Selected element properties popover ── */
+        .ed-props { position: fixed; z-index: 340; width: 216px; background: rgba(10,10,22,.98); border: 1px solid rgba(0,212,255,.35); border-radius: 12px; padding: 13px; box-shadow: 0 14px 44px rgba(0,0,0,.55); display: none; }
+        .ed-props.show { display: block; }
+        .ed-props h5 { font-size: 12px; color: #fff; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .ed-props h5 .badge { margin-left: auto; font-size: 9px; padding: 1px 7px; border-radius: 10px; background: rgba(0,212,255,.15); color: #00d4ff; }
+        .ed-props .pp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+        .ed-props .pp-lbl { font-size: 10px; color: #6b7280; width: 38px; flex-shrink: 0; }
+        .ed-props .pp-input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 6px; color: #fff; font-size: 11px; padding: 5px 8px; outline: none; font-family: inherit; }
+        .ed-props .pp-input:focus { border-color: rgba(0,212,255,.4); }
+        .ed-props .pp-color { width: 34px; height: 28px; border-radius: 6px; border: 1px solid rgba(255,255,255,.12); cursor: pointer; padding: 0; background: none; overflow: hidden; }
+        .ed-props .pp-color::-webkit-color-swatch-wrapper { padding: 0; }
+        .ed-props .pp-color::-webkit-color-swatch { border: none; border-radius: 5px; }
+        .ed-props .pp-range { flex: 1; accent-color: #00d4ff; }
+        .ed-props .pp-del { width: 100%; margin-top: 6px; padding: 8px; border-radius: 8px; border: 1px solid rgba(239,68,68,.4); background: rgba(239,68,68,.12); color: #ef4444; font-size: 11px; cursor: pointer; font-family: inherit; transition: all .15s; }
+        .ed-props .pp-del:hover { background: rgba(239,68,68,.22); }
+
+        /* ── Tutorial overlay ── */
+        #tutorialOverlay { position: fixed; inset: 0; z-index: 2500; background: rgba(6,6,15,.74); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; padding: 20px; }
+        #tutorialOverlay.show { display: flex; }
+        .tut-card { width: 440px; max-width: 92vw; max-height: 88vh; overflow-y: auto; background: #0c0c1a; border: 1px solid rgba(0,212,255,.32); border-radius: 18px; padding: 24px; box-shadow: 0 24px 70px rgba(0,0,0,.6); }
+        .tut-card .step { font-size: 11px; color: #00d4ff; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+        .tut-card h3 { font-size: 17px; color: #fff; margin: 7px 0 12px; }
+        .tut-card p { font-size: 12.5px; color: #cbd5e1; line-height: 1.85; }
+        .tut-card p code { background: rgba(0,212,255,.12); color: #00d4ff; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+        .tut-card .tip { margin-top: 12px; font-size: 11px; color: #fbbf24; background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.2); border-radius: 9px; padding: 9px 11px; line-height: 1.65; }
+        .tut-prog { display: flex; gap: 5px; margin: 18px 0 14px; }
+        .tut-prog i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.12); transition: background .2s; }
+        .tut-prog i.on { background: #00d4ff; }
+        .tut-actions { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+        .tut-actions .left { font-size: 11px; color: #6b7280; }
+        .tut-btn { padding: 8px 17px; border-radius: 9px; border: 1px solid rgba(0,212,255,.45); background: rgba(0,212,255,.15); color: #00d4ff; font-size: 12px; cursor: pointer; font-family: inherit; transition: all .15s; }
+        .tut-btn:hover { background: rgba(0,212,255,.26); }
+        .tut-btn.ghost { background: none; border-color: rgba(255,255,255,.16); color: #9ca3af; }
+        .tut-btn.ghost:hover { background: rgba(255,255,255,.06); }
+        .tut-btn:disabled { opacity: .4; cursor: default; }
+
+        /* ── 3D return hint ── */
+        #edReturnHint { position: fixed; top: 66px; left: 50%; transform: translateX(-50%); z-index: 340; display: none; align-items: center; gap: 12px; background: rgba(10,10,22,.96); border: 1px solid rgba(0,212,255,.35); border-radius: 12px; padding: 11px 16px; font-size: 12px; color: #cbd5e1; box-shadow: 0 10px 34px rgba(0,0,0,.5); }
+        #edReturnHint.show { display: flex; }
+        #edReturnHint .ico { font-size: 15px; }
+        #edReturnHint button { padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(0,212,255,.45); background: rgba(0,212,255,.15); color: #00d4ff; font-size: 11px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        #edReturnHint button:hover { background: rgba(0,212,255,.26); }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="hdr">
+    <span class="hdr-title">🏢 室内地图 · 3D 真实建模</span>
+    <div class="hdr-sep"></div>
+    <span class="hdr-sub" id="bldName">北京国贸中心</span>
+    <div class="hdr-right">
+        <button class="hdr-btn tut" onclick="showTutorial(0)" title="查看使用教程">📖 教程</button>
+        <button class="hdr-btn" id="edToggleBtn" onclick="toggleEditor()">✏️ 建筑建模</button>
+        <span id="floorTag" style="font-size:11px;color:#6b7280;"></span>
+        <span id="poiCountTag" style="font-size:11px;color:#6b7280;"></span>
+    </div>
+</header>
+
+<!-- ── Main ── -->
+<div class="main">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+
+        <!-- Key guide (hidden when key valid) -->
+        <div id="keyGuide">
+            <div class="kg-box">
+                <h2>⚠️ 请填入高德 Key</h2>
+                <p>地图加载需要有效的<strong> Web 端 JS API Key</strong>。</p>
+                <pre>1. 打开 https://console.amap.com/dev/key/app
+2. 创建 Web 端 JS API Key（不是 Web 服务 API）
+3. 添加域名白名单: <code>localhost</code>, <code>127.0.0.1</code>
+4. 复制 Key，替换 HTML 中 <code>key=YOUR_KEY_HERE</code>
+5. 刷新页面</pre>
+                <p style="color:#6b7280;font-size:11px;">如果已有 Key，直接修改文件第 7 行替换即可。</p>
+                <button class="btn btn-ghost" onclick="skipKey()">用演示数据体验（无需 Key）</button>
+            </div>
+        </div>
+
+        <!-- Demo data notice -->
+        <div class="card" id="demoNotice" style="display:none; background: rgba(251,191,36,.06); border-color: rgba(251,191,36,.15);">
+            <div class="card-title" style="color:#fbbf24;"><span>📍</span>演示模式</div>
+            <p style="font-size:11px;color:#9ca3af;line-height:1.6;">使用内置真实数据演示。地图不可用时请在控制台申请 Web JS API Key。</p>
+            <button class="btn btn-ghost" style="margin-top:8px;font-size:11px;" onclick="document.getElementById('keyGuide').style.display='flex'">填写 Key</button>
+        </div>
+
+        <!-- Building select -->
+        <div class="card">
+            <div class="card-title"><span>🏬</span>搜索商场</div>
+            <!-- City selector -->
+            <div class="mall-search-row" style="margin-bottom:4px;">
+                <select id="citySelect" class="s-input" style="border-radius:7px;flex:1;font-size:12px;color:#d1d5db;background:rgba(255,255,255,.04);" onchange="onCityChange(this.value)">
+                    <option value="">全国</option>
+                    <option value="北京">北京</option>
+                    <option value="上海">上海</option>
+                    <option value="广州">广州</option>
+                    <option value="深圳">深圳</option>
+                    <option value="成都">成都</option>
+                    <option value="杭州">杭州</option>
+                    <option value="重庆">重庆</option>
+                    <option value="武汉">武汉</option>
+                    <option value="西安">西安</option>
+                    <option value="南京">南京</option>
+                    <option value="天津">天津</option>
+                    <option value="苏州">苏州</option>
+                    <option value="郑州">郑州</option>
+                    <option value="长沙">长沙</option>
+                    <option value="沈阳">沈阳</option>
+                    <option value="青岛">青岛</option>
+                    <option value="济南">济南</option>
+                    <option value="大连">大连</option>
+                    <option value="哈尔滨">哈尔滨</option>
+                    <option value="长春">长春</option>
+                    <option value="昆明">昆明</option>
+                    <option value="福州">福州</option>
+                    <option value="厦门">厦门</option>
+                    <option value="石家庄">石家庄</option>
+                    <option value="南昌">南昌</option>
+                    <option value="贵阳">贵阳</option>
+                    <option value="太原">太原</option>
+                    <option value="兰州">兰州</option>
+                </select>
+            </div>
+            <!-- Mall search -->
+           </div>
+        <!-- Source toggle: 高德在线 / 本地库 -->
+        <div class="mall-search-row" style="margin-bottom:6px;">
+            <div class="src-toggle" id="mallSrcToggle">
+                <button class="src-btn active" data-src="online" onclick="setMallSource('online')">高德在线</button>
+                <button class="src-btn" data-src="local" onclick="setMallSource('local')">本地库</button>
+            </div>
+        </div>
+        <!-- Mall search -->
+        <div class="mall-search-row">
+            <input type="text" id="mallSearchInput" class="s-input" placeholder="商场名/品牌，留空搜『商场』"
+                onkeydown="if(event.key==='Enter')searchMall()" style="border-radius:7px 0 0 7px;flex:1;" />
+            <button class="s-btn" id="mallSearchBtn" style="border-radius:0 7px 7px 0;padding:0 12px;" onclick="searchMall()">搜索</button>
+        </div>
+        <div id="mallSearchResults" class="mall-results" style="display:none;margin-top:6px;max-height:260px;"></div>
+        <div style="font-size:10px;color:#6b7280;margin-top:6px;">💡 选城市缩小范围 · 点结果加载高德室内图</div>
+            <!-- Preset mall list -->
+            <div class="bld-list" id="bldList">
+                <div class="bld-item active" onclick="loadBld(this,'B000A856LJ','北京国贸中心','116.4608','39.9097','朝阳区建国门外大街1号')">
+                    <h5>北京国贸中心</h5><p>7层 · 综合商业</p>
+                </div>
+                <div class="bld-item" onclick="loadBld(this,'B000A8W2N3','三里屯太古里','116.4551','39.9362','朝阳区三里屯路19号')">
+                    <h5>三里屯太古里</h5><p>4层 · 时尚/餐饮</p>
+                </div>
+                <div class="bld-item" onclick="loadBld(this,'B000A8Z2E5','西单大悦城','116.3765','39.9108','西城区西单北大街131号')">
+                    <h5>西单大悦城</h5><p>9层 · 综合</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3D params -->
+        <div class="card">
+            <div class="card-title"><span>🏗️</span>建筑 3D 参数</div>
+            <div class="bld-params">
+                <div class="bld-row">
+                    <span class="bld-lbl">楼层数</span>
+                    <input type="range" class="bld-range" id="pFloors" min="2" max="12" value="7" oninput="updateBldParams()">
+                    <span class="bld-val" id="pFloorsVal">7 层</span>
+                </div>
+                <div class="bld-row">
+                    <span class="bld-lbl">层高</span>
+                    <input type="range" class="bld-range" id="pFloorH" min="2" max="6" step="0.5" value="3.5" oninput="updateBldParams()">
+                    <span class="bld-val" id="pFloorHVal">3.5m</span>
+                </div>
+                <div class="bld-row">
+                    <span class="bld-lbl">宽度</span>
+                    <input type="range" class="bld-range" id="pWidth" min="60" max="300" value="180" oninput="updateBldParams()">
+                    <span class="bld-val" id="pWidthVal">180m</span>
+                </div>
+                <div class="bld-row">
+                    <span class="bld-lbl">深度</span>
+                    <input type="range" class="bld-range" id="pDepth" min="60" max="200" value="120" oninput="updateBldParams()">
+                    <span class="bld-val" id="pDepthVal">120m</span>
+                </div>
+                <div class="bld-row">
+                    <span class="bld-lbl">外墙色</span>
+                    <input type="color" id="pExtCol" value="#1e3a5f" oninput="updateBldParams()">
+                    <span class="bld-lbl" style="margin-left:8px;">配色</span>
+                    <input type="color" id="pIntCol" value="#0a1628" oninput="updateBldParams()">
+                </div>
+                <button class="btn btn-ghost" style="margin-top:6px;font-size:11px;" onclick="resetBldParams()">重置参数</button>
+            </div>
+        </div>
+
+        <!-- Floor nav -->
+        <div class="card" id="floorCard" style="display:none;">
+            <div class="card-title"><span>🏢</span>楼层</div>
+            <div class="floor-scroll" id="floorScroll"></div>
+            <div class="fc-row">
+                <button class="fc-btn" id="fcUp" onclick="fcMove(-1)">▲</button>
+                <button class="fc-btn" id="fcDn" onclick="fcMove(+1)">▼</button>
+                <button class="fc-btn" onclick="fcReset()">⊙</button>
+            </div>
+        </div>
+
+        <!-- Mode -->
+        <div class="card">
+            <div class="card-title"><span>🎮</span>视图模式</div>
+            <div class="mode-row">
+                <button class="mode-btn active" id="mb-amap" onclick="setMode('amap')">AMap 地图</button>
+                <button class="mode-btn" id="mb-three" onclick="setMode('three')">3D 建筑</button>
+                <button class="mode-btn" id="mb-fusion" onclick="setMode('fusion')">融合</button>
+            </div>
+            <div class="fc-row" style="margin-top:6px;">
+                <button class="angle-btn" onclick="setAngle('top')">俯视</button>
+                <button class="angle-btn" onclick="setAngle('iso')">等距</button>
+                <button class="angle-btn" onclick="setAngle('front')">正视</button>
+                <button class="angle-btn" onclick="setAngle('side')">侧视</button>
+            </div>
+        </div>
+
+        <!-- Nav -->
+        <div class="card" id="navCard" style="display:none;">
+            <div class="card-title"><span>🧭</span>室内导航</div>
+            <p style="font-size:10px;color:#6b7280;margin-bottom:6px;">点击地图上的店铺，设置起点和终点</p>
+            <div class="nav-ctrl">
+                <button class="btn btn-ghost" style="flex:1;font-size:11px;" onclick="clearNav()">清除路径</button>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="card">
+            <div class="card-title"><span>🔍</span>搜索</div>
+            <div class="search-row">
+                <input type="text" class="s-input" id="sInput" placeholder="店铺名称..." onkeydown="if(event.key==='Enter')doSearch()" />
+                <button class="s-btn" onclick="doSearch()">搜</button>
+            </div>
+            <div class="results" id="sResults" style="display:none;"></div>
+        </div>
+
+        <!-- Legend -->
+        <div class="card">
+            <div class="card-title"><span>📋</span>图例</div>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>购物</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>餐饮</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ec4899"></div>娱乐</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#6b7280"></div>停车</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>服务</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>其他</div>
+            </div>
+        </div>
+
+        <!-- Data -->
+        <div class="card">
+            <div class="card-title"><span>💾</span>数据</div>
+            <div class="upload-zone" onclick="document.getElementById('geoJsonFile').click()">
+                <div class="icon">📁</div>
+                <div class="text">导入 GeoJSON</div>
+                <div class="sub">国贸中心_geojson.geojson</div>
+            </div>
+            <input type="file" id="geoJsonFile" accept=".json,.geojson" style="display:none" onchange="handleGeoJsonUpload(event)" />
+            <button class="btn btn-orange" style="margin-top:6px;font-size:11px;width:100%;" onclick="loadBuiltInData()">加载内置演示数据</button>
+        </div>
+
+    </aside>
+
+    <!-- ── Drawing canvas overlay ── -->
+    <canvas id="edCanvas"></canvas>
+
+    <!-- ── Building modeling editor panel ── -->
+    <div id="edPanel">
+        <div class="ed-hdr">
+            <span class="ed-hdr-title">🏗️ 建筑建模编辑器</span>
+            <div class="ed-hdr-floor">
+                <select id="edFloorSel" onchange="edSwitchFloor(this.value)"></select>
+            </div>
+            <button class="ed-close" onclick="toggleEditor()" title="关闭">✕</button>
+        </div>
+
+        <!-- Quick start guide -->
+        <div class="ed-quickstart" id="edQuickStart">
+            <div class="ed-qs-head" onclick="edToggleQS()">
+                <span class="ic">🚀</span><span class="t">快速开始（5 步建模）</span>
+                <span class="s" id="edQSToggle">收起 ▲</span>
+            </div>
+            <div class="ed-qs-steps" id="edQSSteps">
+                <div class="ed-qs-step" id="qs-step-0" onclick="edQSGo(0)"><span class="n"><span>1</span></span> 画建筑<strong>外墙</strong>轮廓 <span class="d">外墙工具</span></div>
+                <div class="ed-qs-step" id="qs-step-1" onclick="edQSGo(1)"><span class="n"><span>2</span></span> 画<strong>隔墙</strong>划分空间 <span class="d">隔墙工具</span></div>
+                <div class="ed-qs-step" id="qs-step-2" onclick="edQSGo(2)"><span class="n"><span>3</span></span> 画<strong>区域</strong>（店铺/中庭） <span class="d">矩形/多边形</span></div>
+                <div class="ed-qs-step" id="qs-step-3" onclick="edQSGo(3)"><span class="n"><span>4</span></span> 放<strong>标注点</strong> POI <span class="d">标注工具</span></div>
+                <div class="ed-qs-step" id="qs-step-4" onclick="edQSGo(4)"><span class="n"><span>5</span></span> <strong>预览 3D</strong>看效果 <span class="d">预览 3D</span></div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="ed-toolbar">
+            <button class="ed-tool" id="tool-select" onclick="edSetTool('select')" title="选择/移动">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M2 2l5 12 2-4 4-2z"/></svg>
+                <div class="ed-tool-title">选择</div>
+            </button>
+            <button class="ed-tool" onclick="edSetTool('poi')" title="标注 POI">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="5" r="3"/><path d="M7 8v6M4 14h6"/></svg>
+                <div class="ed-tool-title">标注</div>
+            </button>
+            <div class="ed-sep"></div>
+            <button class="ed-tool" id="tool-wall-out" onclick="edSetTool('wall-out')" title="绘制外墙">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="10" height="10"/></svg>
+                <div class="ed-tool-title">外墙</div>
+            </button>
+            <button class="ed-tool" onclick="edSetTool('wall-in')" title="绘制隔墙">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="7" x2="12" y2="7"/><line x1="5" y1="4" x2="5" y2="10"/><line x1="9" y1="4" x2="9" y2="10"/></svg>
+                <div class="ed-tool-title">隔墙</div>
+            </button>
+            <div class="ed-sep"></div>
+            <button class="ed-tool" onclick="edSetTool('rect')" title="矩形区域">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="10" height="8"/></svg>
+                <div class="ed-tool-title">矩形</div>
+            </button>
+            <button class="ed-tool" onclick="edSetTool('poly')" title="多边形">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="7,2 12,6 10,12 4,12 2,6"/></svg>
+                <div class="ed-tool-title">多边形</div>
+            </button>
+            <div class="ed-sep"></div>
+            <button class="ed-tool" onclick="edUndo()" title="撤销">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 7a4 4 0 1 1 1.2 2.8L3 11h5l-1-2H4a2 2 0 1 0 0 4h1"/></svg>
+                <div class="ed-tool-title">撤销</div>
+            </button>
+            <button class="ed-tool" onclick="edClearFloor()" title="清空当前层">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="2" x2="12" y2="12"/><line x1="12" y1="2" x2="2" y2="12"/></svg>
+                <div class="ed-tool-title">清层</div>
+            </button>
+        </div>
+
+        <!-- Draw status -->
+        <div id="edStatusBar" style="padding:5px 12px; flex-shrink:0;"></div>
+
+        <!-- Tabs -->
+        <div class="ed-tabs">
+            <button class="ed-tab active" onclick="edSwitchTab('walls')" id="tab-walls">外墙/隔墙</button>
+            <button class="ed-tab" onclick="edSwitchTab('zones')" id="tab-zones">区域</button>
+            <button class="ed-tab" onclick="edSwitchTab('pois')" id="tab-pois">标注点</button>
+            <button class="ed-tab" onclick="edSwitchTab('floors')" id="tab-floors">楼层</button>
+        </div>
+
+        <!-- Walls tab -->
+        <div class="ed-tab-content active" id="ct-walls">
+            <div class="ed-help">
+                <strong>外墙：</strong>点击依次绘制闭合轮廓顶点，双击或点击起点封闭完成。<br>
+                <strong>隔墙：</strong>点击起点→终点画线段，支持连续绘制。
+            </div>
+            <div id="edWallsList" class="ed-list"></div>
+        </div>
+
+        <!-- Zones tab -->
+        <div class="ed-tab-content" id="ct-zones">
+            <div class="ed-help"><strong>矩形/多边形：</strong>点击添加顶点，双击封闭区域。可设颜色、透明度、标签。</div>
+            <div class="ed-row">
+                <span class="ed-lbl">颜色</span>
+                <input type="color" class="ed-color" id="zoneColor" value="#1e3a5f">
+                <span class="ed-lbl">透明度</span>
+                <input type="range" class="ed-range" id="zoneAlpha" min="0" max="0.8" step="0.05" value="0.4">
+                <span class="ed-lbl" style="width:auto;" id="zoneAlphaLbl">40%</span>
+            </div>
+            <div class="ed-row">
+                <span class="ed-lbl">标签</span>
+                <input type="text" class="ed-input" id="zoneLabel" placeholder="区域名称，如：美食广场">
+            </div>
+            <div id="edZonesList" class="ed-list"></div>
+        </div>
+
+        <!-- POIs tab -->
+        <div class="ed-tab-content" id="ct-pois">
+            <div class="ed-help"><strong>标注点：</strong>点击地图放置 POI，可设置名称和类型。</div>
+            <div class="ed-row">
+                <span class="ed-lbl">名称</span>
+                <input type="text" class="ed-input" id="poiNameInput" placeholder="如：星巴克">
+            </div>
+            <div class="cat-pills" id="catPills">
+                <button class="cat-pill active" style="border-color:#3b82f6;color:#3b82f6" data-cat="shopping">购物</button>
+                <button class="cat-pill" style="border-color:#f59e0b;color:#f59e0b" data-cat="dining">餐饮</button>
+                <button class="cat-pill" style="border-color:#ec4899;color:#ec4899" data-cat="entertainment">娱乐</button>
+                <button class="cat-pill" style="border-color:#10b981;color:#10b981" data-cat="service">服务</button>
+                <button class="cat-pill" style="border-color:#6b7280;color:#6b7280" data-cat="parking">停车</button>
+            </div>
+            <div id="edPoisList" class="ed-list"></div>
+        </div>
+
+        <!-- Floors tab -->
+        <div class="ed-tab-content" id="ct-floors">
+            <div class="ed-help">管理楼层，可添加、删除、重排序。切换楼层切换编辑视野。</div>
+            <div class="ed-row">
+                <input type="text" class="ed-input" id="newFloorName" placeholder="如：B1、L1">
+                <button class="btn btn-sm" onclick="edAddFloor()">+ 添加</button>
+            </div>
+            <div id="edFlList" class="ed-fl-list"></div>
+            <div class="ed-preview-hint" id="edPreviewHint">点击「预览」在 3D 视图中查看</div>
+        </div>
+
+        <!-- Bottom actions -->
+        <div class="ed-actions">
+            <button class="btn btn-sm" style="flex:1" onclick="edPreview3D()">👁️ 预览 3D</button>
+            <button class="btn btn-sm" style="flex:1" onclick="edSaveProject()">💾 保存项目</button>
+            <button class="btn btn-sm btn-ghost" style="flex:1" onclick="edLoadProject()">📂 加载</button>
+        </div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-area">
+        <div id="map"></div>
+        <canvas id="threeCanvas"></canvas>
+        <div id="modePill" class="amap">AMap 地图</div>
+        <div id="statusEl" class="status load"><span class="spinner"></span><span id="statusTxt">初始化中…</span></div>
+        <div id="navInfo"><span id="navTxt"></span><button onclick="clearNav()" title="清除">✕</button></div>
+        <div id="poiInfo">
+            <div class="pi-name" id="poiName"></div>
+            <div class="pi-addr" id="poiAddr"></div>
+            <div class="pi-tags" id="poiTags"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden AMap security script -->
+<script id="sec-verify" src="https://restapi.amap.com/v3/security"></script>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const DEMO_GEOJSON = {
+  type: "FeatureCollection",
+  metadata: { building_name: "北京国贸中心", center_lng: 116.4608, center_lat: 39.9097, total_floors: 7 },
+  features: [
+    { type:"Feature", properties:{id:"SHOP_001",name:"Chanel 精品店",floor:"L1",category:"shopping",color:"#1e40af",brand:"CHANEL"}, geometry:{type:"Point",coordinates:[116.4609,39.9098]} },
+    { type:"Feature", properties:{id:"SHOP_002",name:"Dior 美妆",floor:"L1",category:"shopping",color:"#831843",brand:"DIOR"}, geometry:{type:"Point",coordinates:[116.4611,39.9097]} },
+    { type:"Feature", properties:{id:"SHOP_003",name:"Gucci 专柜",floor:"L2",category:"shopping",color:"#1e3a5f",brand:"GUCCI"}, geometry:{type:"Point",coordinates:[116.4607,39.9099]} },
+    { type:"Feature", properties:{id:"SHOP_004",name:"Prada 专卖店",floor:"L2",category:"shopping",color:"#1e3a5f",brand:"PRADA"}, geometry:{type:"Point",coordinates:[116.4610,39.9096]} },
+    { type:"Feature", properties:{id:"SHOP_005",name:"ZARA 服装",floor:"L3",category:"shopping",color:"#3b82f6",brand:"ZARA"}, geometry:{type:"Point",coordinates:[116.4608,39.9099]} },
+    { type:"Feature", properties:{id:"SHOP_006",name:"UNIQLO 优衣库",floor:"L3",category:"shopping",color:"#3b82f6",brand:"UNIQLO"}, geometry:{type:"Point",coordinates:[116.4611,39.9095]} },
+    { type:"Feature", properties:{id:"SHOP_007",name:"Nike 运动",floor:"L3",category:"shopping",color:"#3b82f6",brand:"NIKE"}, geometry:{type:"Point",coordinates:[116.4605,39.9097]} },
+    { type:"Feature", properties:{id:"FOOD_001",name:"绿茶餐厅",floor:"L4",category:"dining",color:"#92400e"}, geometry:{type:"Point",coordinates:[116.4609,39.9096]} },
+    { type:"Feature", properties:{id:"FOOD_002",name:"外婆家",floor:"L4",category:"dining",color:"#92400e"}, geometry:{type:"Point",coordinates:[116.4612,39.9098]} },
+    { type:"Feature", properties:{id:"FOOD_003",name:"太平洋咖啡",floor:"L4",category:"dining",color:"#92400e"}, geometry:{type:"Point",coordinates:[116.4606,39.9099]} },
+    { type:"Feature", properties:{id:"SVC_001",name:"电梯 A",floor:"L1",category:"service",color:"#065f46",subcategory:"elevator"}, geometry:{type:"Point",coordinates:[116.4608,39.9095]} },
+    { type:"Feature", properties:{id:"SVC_002",name:"电梯 B",floor:"L1",category:"service",color:"#065f46",subcategory:"elevator"}, geometry:{type:"Point",coordinates:[116.4613,39.9097]} },
+    { type:"Feature", properties:{id:"SVC_003",name:"扶梯 1",floor:"L1",category:"service",color:"#065f46",subcategory:"escalator"}, geometry:{type:"Point",coordinates:[116.4605,39.9099]} },
+    { type:"Feature", properties:{id:"SVC_004",name:"女洗手间",floor:"B1",category:"service",color:"#0891b2",subcategory:"toilet"}, geometry:{type:"Point",coordinates:[116.4608,39.9094]} },
+    { type:"Feature", properties:{id:"SVC_005",name:"男洗手间",floor:"B1",category:"service",color:"#0891b2",subcategory:"toilet"}, geometry:{type:"Point",coordinates:[116.4611,39.9094]} },
+    { type:"Feature", properties:{id:"ENT_001",name:"Ole 超市",floor:"B1",category:"shopping",color:"#3b82f6",brand:"Ole"}, geometry:{type:"Point",coordinates:[116.4609,39.9096]} },
+    { type:"Feature", properties:{id:"ENT_002",name:"星巴克",floor:"B1",category:"dining",color:"#92400e",brand:"Starbucks"}, geometry:{type:"Point",coordinates:[116.4607,39.9095]} },
+    { type:"Feature", properties:{id:"ENT_003",name:"停车场 A区",floor:"B2",category:"parking",color:"#1f2937"}, geometry:{type:"Point",coordinates:[116.4606,39.9096]} },
+    { type:"Feature", properties:{id:"ENT_004",name:"停车场 B区",floor:"B3",category:"parking",color:"#1f2937"}, geometry:{type:"Point",coordinates:[116.4610,39.9097]} },
+    { type:"Feature", properties:{id:"ENT_005",name:"东门入口",floor:"L1",category:"service",color:"#10b981",subcategory:"entrance"}, geometry:{type:"Point",coordinates:[116.4614,39.9097]} },
+    { type:"Feature", properties:{id:"ENT_006",name:"西门出口",floor:"L1",category:"service",color:"#f87171",subcategory:"exit"}, geometry:{type:"Point",coordinates:[116.4603,39.9097]} }
+  ]
+};
+
+// Floor display names
+const FLOOR_ORDER = ['B3','B2','B1','L1','L2','L3','L4','L5','L6','L7','L8','R1'];
+const FLOOR_ICONS = { B3:'⬇', B2:'⬇', B1:'⬇', L1:'1', L2:'2', L3:'3', L4:'4', L5:'5', L6:'6', L7:'7', L8:'8', R1:'↑' };
+const FCOLS = { shopping:'#3b82f6', dining:'#f59e0b', entertainment:'#ec4899', parking:'#6b7280', service:'#10b981' };
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+let mapObj = null, indoorPlugin = null, placeSearch = null;
+let scene3 = null, camera3 = null, renderer3 = null, threeCanvas = null;
+let spherical = { t: Math.PI/4, p: Math.PI/3, r: 120 };
+let tSpherical = { ...spherical };
+let center3 = { x: 0, y: 10 };
+let isDrag = false, lastM = { x: 0, y: 0 };
+let floorGroups = [];    // { name, group, fi }
+let poiSprites = [];     // THREE.Sprite[]
+let navMarkers = [];     // AMap markers for nav
+let navPath3D = null;   // THREE nav path line
+let navPath3DMarkers = [];
+let geoMarkers = [];
+let currentGeoData = null;
+let currentFloor = null;
+let currentFloors = [];
+let currentRealFloors = [];     // real Amap indoor floors for a searched mall
+let demoFloors = null;          // initial synthetic floor list (for restore)
+let lastAmapResults = [];       // last online (Amap) search POI list
+const knownIndoor = new Set();  // building ids confirmed to have Amap indoor data
+let mallSource = 'online';      // 'online' (Amap live) | 'local' (offline MALL_DB)
+let currentBldLngLat = [116.4608, 39.9097];
+let currentBldId = 'B000A856LJ';
+let viewMode = 'amap';
+let navStart = null, navEnd = null;
+let animId = null;
+let usingDemoData = false;
+
+// 3D building params
+const BLD_DEF = { floors:7, floorH:3.5, width:180, depth:120, extCol:'#1e3a5f', intCol:'#0a1628' };
+let bld = { ...BLD_DEF };
+
+// Meters per degree at our latitude
+const M_PER_LNG = 111320 * Math.cos(39.9097 * Math.PI / 180);
+const M_PER_LAT = 110540;
+
+// ══════════════════════════════════════════════════════════════
+//  STATUS
+// ══════════════════════════════════════════════════════════════
+function setSt(msg, type='load') {
+    const el = document.getElementById('statusEl');
+    if (!el) return;
+    el.className = `status ${type}`;
+    const icon = { ok:'✅', err:'❌', info:'ℹ️' }[type] || '';
+    el.innerHTML = `${type === 'load' ? '<span class="spinner"></span>' : icon} <span>${msg}</span>`;
+    if (type !== 'load') {
+        setTimeout(() => el?.classList.add('fade'), 3000);
+        setTimeout(() => el?.classList.remove('fade'), 4500);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  COORDINATE TRANSFORMS
+// ══════════════════════════════════════════════════════════════
+// Convert lng/lat → Three.js world space (meters)
+function llToWorld(lng, lat) {
+    return {
+        x: (lng - currentBldLngLat[0]) * M_PER_LNG,
+        z: (lat - currentBldLngLat[1]) * M_PER_LAT
+    };
+}
+// Convert local XZ (meters from building center) → lng/lat
+function worldToLl(x, z) {
+    return [
+        currentBldLngLat[0] + x / M_PER_LNG,
+        currentBldLngLat[1] + z / M_PER_LAT
+    ];
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT: MAP
+// ══════════════════════════════════════════════════════════════
+function initMap() {
+    setSt('初始化地图…', 'load');
+
+    // Always check key – sec-verify is AMap security script
+    const secSrc = document.getElementById('sec-verify')?.src || '';
+    const keyBad = secSrc.includes('YOUR_KEY_HERE') || !secSrc;
+
+    // ── Always run demo mode (no valid key or no map) ──
+    if (keyBad) {
+        document.getElementById('keyGuide').style.display = 'flex';
+        // Short timeout so demo kicks in fast during automated testing
+        setTimeout(() => {
+            _enterDemoMode('Key 未配置，自动演示…');
+        }, 100);
+        // Safety net: if anything stalls, force demo after 2s
+        setTimeout(() => {
+            if (!usingDemoData) _enterDemoMode('安全兜底，进入演示模式…');
+        }, 2000);
+        return;
+    }
+
+    // ── Key looks valid – try to create map ──
+    try {
+        mapObj = new AMap.Map('map', {
+            zoom: 18,
+            center: currentBldLngLat,
+            viewMode: '3D',
+            pitch: 45,
+            showIndoorMap: true,
+            features: ['bg', 'road', 'building', 'point'],
+            mapStyle: 'amap://styles/whitesilver'
+        });
+
+        // Safety net: AMap.Map with a bad key hangs for ~8s internally,
+        // so we must timeout BEFORE that. 2s is enough for headless test / localhost.
+        let mapTimeout = setTimeout(() => {
+            _enterDemoMode('地图 Key 无效，自动切换演示模式');
+        }, 2000);
+
+        mapObj.on('complete', () => {
+            clearTimeout(mapTimeout);
+            setSt('✅ 地图就绪', 'ok');
+            initIndoor();
+            initPlaceSearch();
+            // Build the 3D scene on top of the real map
+            initThree();
+            applyGeoJsonToScene(DEMO_GEOJSON);
+            bindMapEvents();
+            // Show 3D building over the map by default
+            setTimeout(() => setMode('three'), 100);
+        });
+
+        mapObj.on('error', () => {
+            clearTimeout(mapTimeout);
+            _enterDemoMode('地图加载失败，演示模式');
+        });
+
+    } catch (e) {
+        _enterDemoMode('地图初始化失败: ' + e.message);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT: INDOOR
+// ══════════════════════════════════════════════════════════════
+function initIndoor() {
+    try {
+        indoorPlugin = new AMap.IndoorMap({ zIndex: 100, opacity: 1, alwaysShow: true });
+        indoorPlugin.setMap(mapObj);
+        indoorPlugin.on('floor_change', e => {
+            if (e.floor) {
+                currentFloor = e.floor;
+                syncFloorUI(e.floor);
+                if (viewMode !== 'amap') threeSwitchFloor(e.floor);
+            }
+        });
+        // Try to load the building
+        indoorPlugin.showIndoorMap(currentBldId, 0);
+    } catch(e) { /* Indoor map API unavailable */ }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT: PLACESEARCH
+// ══════════════════════════════════════════════════════════════
+function initPlaceSearch() {
+    if (typeof AMap === 'undefined') { console.warn('[PS] AMap not loaded'); return; }
+    AMap.plugin('AMap.PlaceSearch', () => {
+        try {
+            placeSearch = new AMap.PlaceSearch({ pageSize: 10, extensions: 'all' });
+            console.log('[PS] OK, instance:', !!placeSearch);
+        } catch(e) { console.error('[PS] err:', e.message); }
+    });
+}
+
+// ── Offline nationwide mall database ──
+const MALL_DB = [
+    // 北京 20
+    {city:'北京',name:'北京国贸中心',floors:7,lng:116.4608,lat:39.9097,tag:'综合商业',addr:'朝阳区建国门外大街1号'},
+    {city:'北京',name:'三里屯太古里',floors:4,lng:116.4551,lat:39.9362,tag:'时尚/餐饮',addr:'朝阳区三里屯路19号'},
+    {city:'北京',name:'西单大悦城',floors:9,lng:116.3765,lat:39.9108,tag:'综合',addr:'西城区西单北大街131号'},
+    {city:'北京',name:'朝阳大悦城',floors:8,lng:116.5832,lat:39.9596,tag:'综合',addr:'朝阳区朝阳北路101号'},
+    {city:'北京',name:'王府井百货',floors:5,lng:116.4120,lat:39.9165,tag:'综合',addr:'东城区王府井大街138号'},
+    {city:'北京',name:'北京SKP',floors:6,lng:116.4861,lat:39.9140,tag:'奢侈品',addr:'朝阳区建国路87号'},
+    {city:'北京',name:'老佛爷百货',floors:4,lng:116.4795,lat:39.9329,tag:'综合',addr:'西城区西单北大街110号'},
+    {city:'北京',name:'东方新天地',floors:5,lng:116.4247,lat:39.9150,tag:'综合',addr:'东城区东单北大街1号'},
+    {city:'北京',name:'侨福芳草地',floors:4,lng:116.4487,lat:39.9193,tag:'艺术/餐饮',addr:'朝阳区东大桥路9号'},
+    {city:'北京',name:'国贸商城',floors:5,lng:116.4598,lat:39.9083,tag:'综合',addr:'朝阳区建国门外大街1号'},
+    {city:'北京',name:'合生汇',floors:6,lng:116.4852,lat:39.8928,tag:'综合',addr:'朝阳区西大望路甲22号'},
+    {city:'北京',name:'五彩城',floors:5,lng:116.3207,lat:40.0356,tag:'综合',addr:'海淀区清河中街68号'},
+    {city:'北京',name:'龙湖天街',floors:5,lng:116.5018,lat:39.9482,tag:'综合',addr:'朝阳区龙湖长楹天街'},
+    {city:'北京',name:'apm购物中心',floors:6,lng:116.4245,lat:39.9146,tag:'综合',addr:'东城区东单北大街96号'},
+    {city:'北京',name:'银泰中心',floors:5,lng:116.4801,lat:39.9136,tag:'综合',addr:'朝阳区建外大街2号'},
+    {city:'北京',name:'华贸中心',floors:4,lng:116.4959,lat:39.9067,tag:'综合',addr:'朝阳区西大望路6号'},
+    {city:'北京',name:'来福士',floors:4,lng:116.4273,lat:39.9155,tag:'综合',addr:'东城区东直门南大街1号'},
+    {city:'北京',name:'颐堤港',floors:4,lng:116.4923,lat:39.9393,tag:'综合',addr:'朝阳区酒仙桥路18号'},
+    {city:'北京',name:'金融街购物中心',floors:4,lng:116.3593,lat:39.9196,tag:'综合',addr:'西城区金融街金城坊街18号'},
+    {city:'北京',name:'凯德MALL·中关村',floors:5,lng:116.3128,lat:39.9838,tag:'综合',addr:'海淀区中关村大街19号'},
+    // 上海 20
+    {city:'上海',name:'上海IFC国金中心',floors:6,lng:121.2352,lat:31.2065,tag:'综合',addr:'浦东新区世纪大道8号'},
+    {city:'上海',name:'上海环贸广场',floors:5,lng:121.4374,lat:31.2236,tag:'综合',addr:'徐汇区淮海中路999号'},
+    {city:'上海',name:'静安嘉里中心',floors:5,lng:121.4484,lat:31.2283,tag:'综合',addr:'静安区南京西路1515号'},
+    {city:'上海',name:'上海K11购物艺术中心',floors:6,lng:121.4740,lat:31.2226,tag:'艺术/餐饮',addr:'黄浦区淮海中路300号'},
+    {city:'上海',name:'iapm环贸广场',floors:6,lng:121.4374,lat:31.2236,tag:'综合',addr:'徐汇区淮海中路999号'},
+    {city:'上海',name:'上海恒隆广场',floors:5,lng:121.4468,lat:31.2305,tag:'奢侈品',addr:'静安区南京西路1266号'},
+    {city:'上海',name:'来福士广场',floors:5,lng:121.4748,lat:31.2301,tag:'综合',addr:'黄浦区西藏中路268号'},
+    {city:'上海',name:'百联奥特莱斯',floors:2,lng:121.2952,lat:31.0518,tag:'折扣',addr:'青浦区沪青平公路1588号'},
+    {city:'上海',name:'上海万象城',floors:5,lng:121.4093,lat:31.1975,tag:'综合',addr:'闵行区吴中路1599号'},
+    {city:'上海',name:'上海环球港',floors:8,lng:121.4213,lat:31.2438,tag:'综合',addr:'普陀区中山北路3300号'},
+    {city:'上海',name:'五角场万达广场',floors:5,lng:121.5176,lat:31.3020,tag:'综合',addr:'杨浦区国宾路58号'},
+    {city:'上海',name:'上海大悦城',floors:8,lng:121.4756,lat:31.2381,tag:'综合',addr:'静安区西藏北路166号'},
+    {city:'上海',name:'上海合生汇',floors:5,lng:121.4879,lat:31.2120,tag:'综合',addr:'杨浦区国定路309号'},
+    {city:'上海',name:'龙之梦购物中心',floors:6,lng:121.4436,lat:31.2245,tag:'综合',addr:'长宁区长宁路1018号'},
+    {city:'上海',name:'上海新天地广场',floors:5,lng:121.4751,lat:31.2229,tag:'综合',addr:'黄浦区淮海中路333号'},
+    {city:'上海',name:'港汇恒隆广场',floors:7,lng:121.4382,lat:31.2207,tag:'综合',addr:'徐汇区虹桥路1号'},
+    {city:'上海',name:'白玉兰广场',floors:4,lng:121.5003,lat:31.2607,tag:'综合',addr:'虹口区东长治路588号'},
+    {city:'上海',name:'北外滩来福士',floors:5,lng:121.4946,lat:31.2544,tag:'综合',addr:'虹口区东大名路1089号'},
+    {city:'上海',name:'上海陆家嘴中心',floors:5,lng:121.5056,lat:31.2399,tag:'综合',addr:'浦东新区世纪大道100号'},
+    {city:'上海',name:'凯德龙之梦',floors:6,lng:121.4272,lat:31.2308,tag:'综合',addr:'长宁区长宁路1018号'},
+    // 广州 12
+    {city:'广州',name:'太古汇',floors:5,lng:113.3276,lat:23.1345,tag:'综合',addr:'天河区天河路383号'},
+    {city:'广州',name:'天河城',floors:6,lng:113.3301,lat:23.1361,tag:'综合',addr:'天河区天河路208号'},
+    {city:'广州',name:'正佳广场',floors:7,lng:113.3302,lat:23.1330,tag:'综合',addr:'天河区天河路228号'},
+    {city:'广州',name:'万菱汇',floors:5,lng:113.3307,lat:23.1398,tag:'综合',addr:'天河区天河路123号'},
+    {city:'广州',name:'天环广场',floors:4,lng:113.3309,lat:23.1357,tag:'综合',addr:'天河区天河路218号'},
+    {city:'广州',name:'广州K11',floors:5,lng:113.3197,lat:23.1199,tag:'艺术/餐饮',addr:'天河区珠江东路6号'},
+    {city:'广州',name:'丽柏广场',floors:4,lng:113.3290,lat:23.1377,tag:'奢侈品',addr:'天河区天河路228号'},
+    {city:'广州',name:'中华广场',floors:5,lng:113.3048,lat:23.1389,tag:'综合',addr:'越秀区中山三路33号'},
+    {city:'广州',name:'百信广场',floors:5,lng:113.2727,lat:23.1945,tag:'综合',addr:'白云区机场路139号'},
+    {city:'广州',name:'凯德广场',floors:5,lng:113.2607,lat:23.1809,tag:'综合',addr:'白云区云城西路890号'},
+    {city:'广州',name:'奥园广场',floors:5,lng:113.3270,lat:23.0560,tag:'综合',addr:'番禺区汉溪大道382号'},
+    {city:'广州',name:'珠江新城广粤天地',floors:3,lng:113.3230,lat:23.1185,tag:'餐饮/休闲',addr:'天河区清风街1号'},
+    // 深圳 12
+    {city:'深圳',name:'深圳万象城',floors:6,lng:114.1128,lat:22.5410,tag:'综合',addr:'罗湖区宝安南路1881号'},
+    {city:'深圳',name:'深圳KKMALL',floors:4,lng:114.1153,lat:22.5413,tag:'综合',addr:'罗湖区红宝路28号'},
+    {city:'深圳',name:'COCO Park',floors:4,lng:114.0578,lat:22.5423,tag:'综合',addr:'福田区福华三路268号'},
+    {city:'深圳',name:'深圳壹方城',floors:6,lng:114.0491,lat:22.5589,tag:'综合',addr:'宝安区创业一路1000号'},
+    {city:'深圳',name:'深圳海岸城',floors:5,lng:113.9347,lat:22.5099,tag:'综合',addr:'南山区文心五路33号'},
+    {city:'深圳',name:'深圳湾万象城',floors:4,lng:113.9412,lat:22.4857,tag:'综合',addr:'南山区科苑南路2888号'},
+    {city:'深圳',name:'华润城万象天地',floors:5,lng:113.9314,lat:22.5288,tag:'综合',addr:'南山区深南大道9668号'},
+    {city:'深圳',name:'金光华广场',floors:5,lng:114.1215,lat:22.5407,tag:'综合',addr:'罗湖区人民南路2028号'},
+    {city:'深圳',name:'皇庭广场',floors:4,lng:114.0558,lat:22.5407,tag:'综合',addr:'福田区福华路28号'},
+    {city:'深圳',name:'欢乐海岸',floors:3,lng:113.9835,lat:22.5104,tag:'餐饮/休闲',addr:'南山区白石路东8号'},
+    {city:'深圳',name:'深业上城',floors:4,lng:114.0664,lat:22.5694,tag:'综合',addr:'福田区皇岗路5001号'},
+    {city:'深圳',name:'卓悦中心',floors:4,lng:114.0575,lat:22.5456,tag:'综合',addr:'福田区福华路348号'},
+    // 成都 10
+    {city:'成都',name:'成都IFS国际金融中心',floors:7,lng:104.0648,lat:30.6587,tag:'综合',addr:'锦江区红星路三段1号'},
+    {city:'成都',name:'成都远洋太古里',floors:3,lng:104.0620,lat:30.6595,tag:'时尚/餐饮',addr:'锦江区大慈寺路54号'},
+    {city:'成都',name:'成都万象城',floors:6,lng:104.0861,lat:30.6646,tag:'综合',addr:'成华区双庆路8号'},
+    {city:'成都',name:'成都大悦城',floors:5,lng:103.9095,lat:30.5754,tag:'综合',addr:'武侯区武侯大道顺江段38号'},
+    {city:'成都',name:'成都银泰中心',floors:5,lng:104.0643,lat:30.6306,tag:'综合',addr:'高新区天府大道1199号'},
+    {city:'成都',name:'成都来福士',floors:5,lng:104.0660,lat:30.6485,tag:'综合',addr:'武侯区人民南路四段3号'},
+    {city:'成都',name:'成都群光广场',floors:6,lng:104.0673,lat:30.6695,tag:'综合',addr:'锦江区春熙路东段33号'},
+    {city:'成都',name:'成都王府井百货',floors:5,lng:104.0661,lat:30.6687,tag:'综合',addr:'锦江区总府路15号'},
+    {city:'成都',name:'成都339',floors:5,lng:104.0913,lat:30.6649,tag:'综合',addr:'成华区双林路339号'},
+    {city:'成都',name:'成都仁和新城',floors:5,lng:104.0610,lat:30.6281,tag:'综合',addr:'高新区天府大道北段28号'},
+    // 杭州 10
+    {city:'杭州',name:'杭州大厦',floors:5,lng:120.1602,lat:30.2687,tag:'综合',addr:'拱墅区武林广场1号'},
+    {city:'杭州',name:'杭州万象城',floors:5,lng:120.2145,lat:30.2626,tag:'综合',addr:'江干区富春路701号'},
+    {city:'杭州',name:'杭州银泰百货',floors:5,lng:120.1553,lat:30.2775,tag:'综合',addr:'下城区延安路530号'},
+    {city:'杭州',name:'杭州嘉里中心',floors:4,lng:120.1522,lat:30.2646,tag:'综合',addr:'下城区延安路353号'},
+    {city:'杭州',name:'杭州来福士',floors:5,lng:120.2245,lat:30.2474,tag:'综合',addr:'江干区新业路228号'},
+    {city:'杭州',name:'杭州大悦城',floors:5,lng:120.1389,lat:30.2655,tag:'综合',addr:'拱墅区莫干山路813号'},
+    {city:'杭州',name:'杭州龙湖金沙天街',floors:5,lng:120.2178,lat:30.3115,tag:'综合',addr:'江干区金沙大道560号'},
+    {city:'杭州',name:'杭州奥体印象城',floors:5,lng:120.2353,lat:30.2140,tag:'综合',addr:'萧山区金城路1588号'},
+    {city:'杭州',name:'杭州远洋乐堤港',floors:4,lng:120.1508,lat:30.3010,tag:'综合',addr:'拱墅区大关路58号'},
+    {city:'杭州',name:'杭州in77',floors:5,lng:120.1539,lat:30.2532,tag:'综合',addr:'上城区延安路292号'},
+    // 重庆 8
+    {city:'重庆',name:'重庆IFS国金中心',floors:6,lng:106.5195,lat:29.5582,tag:'综合',addr:'江北区江北嘴庆云路1号'},
+    {city:'重庆',name:'重庆万象城',floors:6,lng:106.5176,lat:29.5535,tag:'综合',addr:'九龙坡区谢家湾正街55号'},
+    {city:'重庆',name:'龙湖重庆时代天街',floors:6,lng:106.5320,lat:29.5589,tag:'综合',addr:'渝中区大坪龙湖时代天街'},
+    {city:'重庆',name:'重庆大悦城',floors:5,lng:106.5260,lat:29.5388,tag:'综合',addr:'渝北区金开大道70号'},
+    {city:'重庆',name:'重庆来福士',floors:6,lng:106.5778,lat:29.5565,tag:'综合',addr:'渝中区接圣街8号'},
+    {city:'重庆',name:'重庆光环购物中心',floors:5,lng:106.5182,lat:29.6187,tag:'综合',addr:'渝北区湖彩路88号'},
+    {city:'重庆',name:'重庆观音桥大融城',floors:5,lng:106.4925,lat:29.5541,tag:'综合',addr:'江北区观音桥大融城'},
+    {city:'重庆',name:'重庆龙湖源著天街',floors:5,lng:106.5106,lat:29.5812,tag:'综合',addr:'江北区新南路168号'},
+    // 武汉 8
+    {city:'武汉',name:'武汉武商摩尔城',floors:7,lng:114.2896,lat:30.5698,tag:'综合',addr:'江汉区解放大道690号'},
+    {city:'武汉',name:'武汉国际广场',floors:6,lng:114.2895,lat:30.5700,tag:'综合',addr:'江汉区解放大道372号'},
+    {city:'武汉',name:'武汉光谷K11',floors:4,lng:114.4321,lat:30.5020,tag:'艺术/餐饮',addr:'洪山区光谷关山大道'},
+    {city:'武汉',name:'武汉楚河汉街',floors:4,lng:114.2712,lat:30.5602,tag:'综合',addr:'武昌区楚河汉街'},
+    {city:'武汉',name:'武汉万象城',floors:5,lng:114.3015,lat:30.6088,tag:'综合',addr:'江岸区建设大道668号'},
+    {city:'武汉',name:'武汉群光广场',floors:5,lng:114.3612,lat:30.5145,tag:'综合',addr:'洪山区珞喻路6号'},
+    {city:'武汉',name:'武汉荟聚中心',floors:4,lng:114.2689,lat:30.5952,tag:'综合',addr:'硚口区解放大道18号'},
+    {city:'武汉',name:'武汉K11 Select',floors:4,lng:114.2893,lat:30.5695,tag:'艺术/餐饮',addr:'江汉区解放大道372号'},
+    // 西安 8
+    {city:'西安',name:'西安赛格国际购物中心',floors:8,lng:108.9446,lat:34.2265,tag:'综合',addr:'雁塔区长安中路123号'},
+    {city:'西安',name:'西安SKP',floors:5,lng:108.9495,lat:34.2258,tag:'奢侈品',addr:'碑林区长安北路261号'},
+    {city:'西安',name:'西安大悦城',floors:5,lng:108.9510,lat:34.2261,tag:'综合',addr:'雁塔区小寨路208号'},
+    {city:'西安',name:'西安老城根G-Park',floors:4,lng:108.9385,lat:34.2586,tag:'艺术/餐饮',addr:'莲湖区星火路22号'},
+    {city:'西安',name:'西安大融城',floors:5,lng:108.9357,lat:34.2498,tag:'综合',addr:'未央区未央路130号'},
+    {city:'西安',name:'西安龙首印象城',floors:5,lng:108.9458,lat:34.2756,tag:'综合',addr:'未央区未央路151号'},
+    {city:'西安',name:'西安高新中大国际',floors:5,lng:108.8962,lat:34.2357,tag:'综合',addr:'雁塔区高新路72号'},
+    {city:'西安',name:'西安MOMOPARK',floors:5,lng:108.9072,lat:34.2358,tag:'综合',addr:'雁塔区小寨西路232号'},
+    // 南京 8
+    {city:'南京',name:'南京新街口百货',floors:6,lng:118.7914,lat:32.0425,tag:'综合',addr:'玄武区中山南路1号'},
+    {city:'南京',name:'南京IFC国金中心',floors:5,lng:118.7784,lat:32.0472,tag:'综合',addr:'建邺区江东中路347号'},
+    {city:'南京',name:'南京金鹰世界',floors:6,lng:118.7659,lat:32.0527,tag:'综合',addr:'建邺区应天大街888号'},
+    {city:'南京',name:'南京景枫KINGMO',floors:5,lng:118.7895,lat:31.9647,tag:'综合',addr:'江宁区双龙大道1698号'},
+    {city:'南京',name:'南京虹悦城',floors:5,lng:118.7962,lat:32.0267,tag:'综合',addr:'雨花台区应天大街619号'},
+    {city:'南京',name:'南京河西金茂汇',floors:5,lng:118.7625,lat:32.0585,tag:'综合',addr:'建邺区清凉门大街1号'},
+    {city:'南京',name:'南京华采天地',floors:5,lng:118.7784,lat:32.0472,tag:'综合',addr:'建邺区江东中路258号'},
+    {city:'南京',name:'南京21世纪太阳城',floors:5,lng:118.7869,lat:31.9737,tag:'综合',addr:'江宁区双龙大道1539号'},
+    // 天津 6
+    {city:'天津',name:'天津大悦城',floors:5,lng:117.2185,lat:39.1368,tag:'综合',addr:'南开区南门外大街2号'},
+    {city:'天津',name:'天津恒隆广场',floors:5,lng:117.2150,lat:39.1288,tag:'综合',addr:'和平区和平路228号'},
+    {city:'天津',name:'天津银河国际',floors:4,lng:117.2602,lat:39.1182,tag:'综合',addr:'河西区乐园道9号'},
+    {city:'天津',name:'天津海信广场',floors:5,lng:117.2580,lat:39.1182,tag:'奢侈品',addr:'河西区解放南路与蚌埠道交口'},
+    {city:'天津',name:'天津L+MALL',floors:5,lng:117.1953,lat:39.1382,tag:'综合',addr:'南开区东马路131号'},
+    {city:'天津',name:'天津滨海文化中心',floors:4,lng:117.6493,lat:39.0273,tag:'综合',addr:'滨海新区旭升路347号'},
+    // 苏州 6
+    {city:'苏州',name:'苏州中心',floors:6,lng:120.6324,lat:31.3155,tag:'综合',addr:'工业园区苏州中心广场'},
+    {city:'苏州',name:'苏州印象城',floors:5,lng:120.6225,lat:31.3202,tag:'综合',addr:'工业园区现代大道1699号'},
+    {city:'苏州',name:'苏州圆融时代广场',floors:5,lng:120.6463,lat:31.3195,tag:'综合',addr:'工业园区右岸街101号'},
+    {city:'苏州',name:'苏州龙湖狮山天街',floors:5,lng:120.5476,lat:31.2857,tag:'综合',addr:'虎丘区塔园路181号'},
+    {city:'苏州',name:'苏州诚品生活',floors:5,lng:120.6468,lat:31.3272,tag:'文化/餐饮',addr:'工业园区月廊街8号'},
+    {city:'苏州',name:'苏州大悦春风里',floors:5,lng:120.5725,lat:31.3645,tag:'综合',addr:'相城区御窑路1999号'},
+    // 郑州 6
+    {city:'郑州',name:'郑州丹尼斯大卫城',floors:6,lng:113.6525,lat:34.7689,tag:'综合',addr:'金水区二七路1号'},
+    {city:'郑州',name:'郑州正弘城',floors:5,lng:113.6245,lat:34.7755,tag:'综合',addr:'金水区花园路126号'},
+    {city:'郑州',name:'郑州万象城',floors:5,lng:113.6535,lat:34.7698,tag:'综合',addr:'二七区民主路10号'},
+    {city:'郑州',name:'郑州CityOn熙地港',floors:4,lng:113.6288,lat:34.8012,tag:'综合',addr:'郑东新区农业东路31号'},
+    {city:'郑州',name:'郑州大融城',floors:5,lng:113.6145,lat:34.7548,tag:'综合',addr:'二七区大学路30号'},
+    {city:'郑州',name:'郑州金水印象汇',floors:4,lng:113.6190,lat:34.7698,tag:'综合',addr:'金水区金水路8号'},
+    // 长沙 6
+    {city:'长沙',name:'长沙IFS',floors:7,lng:112.9723,lat:28.2255,tag:'综合',addr:'芙蓉区解放西路188号'},
+    {city:'长沙',name:'长沙海信广场',floors:5,lng:112.9756,lat:28.2280,tag:'综合',addr:'天心区湘江中路2段36号'},
+    {city:'长沙',name:'长沙步步高梅溪新天地',floors:5,lng:112.8825,lat:28.1875,tag:'综合',addr:'岳麓区枫林三路1099号'},
+    {city:'长沙',name:'长沙悦方ID Mall',floors:4,lng:112.9825,lat:28.2288,tag:'综合',addr:'天心区坡子街216号'},
+    {city:'长沙',name:'长沙凯德壹中心',floors:5,lng:112.9445,lat:28.2438,tag:'综合',addr:'岳麓区茶子山路388号'},
+    {city:'长沙',name:'长沙运达汇',floors:5,lng:113.0165,lat:28.1952,tag:'综合',addr:'雨花区长沙大道567号'},
+    // 沈阳 5
+    {city:'沈阳',name:'沈阳万象城',floors:6,lng:123.4238,lat:41.7855,tag:'综合',addr:'和平区青年大街288号'},
+    {city:'沈阳',name:'沈阳大悦城',floors:5,lng:123.4152,lat:41.7920,tag:'综合',addr:'大东区小东路8号'},
+    {city:'沈阳',name:'沈阳恒隆广场',floors:5,lng:123.4238,lat:41.7856,tag:'奢侈品',addr:'和平区青年大街1号'},
+    {city:'沈阳',name:'沈阳铁西万象汇',floors:5,lng:123.3685,lat:41.7922,tag:'综合',addr:'铁西区建设东路158号'},
+    {city:'沈阳',name:'沈阳嘉里城',floors:4,lng:123.4568,lat:41.7835,tag:'综合',addr:'沈河区青年大街211号'},
+    // 青岛 5
+    {city:'青岛',name:'青岛万象城',floors:6,lng:120.3815,lat:36.0675,tag:'综合',addr:'市南区山东路6号'},
+    {city:'青岛',name:'青岛海信广场',floors:5,lng:120.3972,lat:36.0695,tag:'奢侈品',addr:'市南区澳门路117号'},
+    {city:'青岛',name:'青岛百丽广场',floors:5,lng:120.3845,lat:36.0655,tag:'综合',addr:'市南区澳门路129号'},
+    {city:'青岛',name:'青岛凯德MALL',floors:5,lng:120.3485,lat:36.0912,tag:'综合',addr:'市北区黑龙江南路18号'},
+    {city:'青岛',name:'青岛金狮广场',floors:5,lng:120.4612,lat:36.1045,tag:'综合',addr:'崂山区香港东路195号'},
+    // 济南 4
+    {city:'济南',name:'济南恒隆广场',floors:6,lng:117.0235,lat:36.6615,tag:'综合',addr:'历下区泉城路188号'},
+    {city:'济南',name:'济南万象城',floors:5,lng:117.0535,lat:36.6618,tag:'综合',addr:'历下区经十路11111号'},
+    {city:'济南',name:'济南贵和购物中心',floors:5,lng:117.0212,lat:36.6625,tag:'奢侈品',addr:'历下区泉城路103号'},
+    {city:'济南',name:'济南魏家庄万达',floors:5,lng:116.9985,lat:36.6625,tag:'综合',addr:'市中区经四路5号'},
+    // 大连 4
+    {city:'大连',name:'大连恒隆广场',floors:5,lng:121.6325,lat:38.9195,tag:'综合',addr:'西岗区五四路66号'},
+    {city:'大连',name:'大连凯德和平广场',floors:5,lng:121.6245,lat:38.9125,tag:'综合',addr:'沙河口区中山路427号'},
+    {city:'大连',name:'大连柏威年购物中心',floors:5,lng:121.6368,lat:38.9248,tag:'综合',addr:'中山区中山路108号'},
+    {city:'大连',name:'大连华南万象汇',floors:5,lng:121.5878,lat:38.9825,tag:'综合',addr:'甘井子区中华西路25号'},
+    // 哈尔滨 4
+    {city:'哈尔滨',name:'哈尔滨王府井购物中心',floors:5,lng:126.6355,lat:45.7552,tag:'综合',addr:'道里区中央大街87号'},
+    {city:'哈尔滨',name:'哈尔滨银泰城',floors:5,lng:126.6288,lat:45.7712,tag:'综合',addr:'南岗区东大直街328号'},
+    {city:'哈尔滨',name:'哈尔滨红博会展城',floors:5,lng:126.6398,lat:45.7218,tag:'综合',addr:'南岗区红旗大街301号'},
+    {city:'哈尔滨',name:'哈尔滨万象汇',floors:5,lng:126.6285,lat:45.7565,tag:'综合',addr:'南岗区建设街146号'},
+    // 长春 4
+    {city:'长春',name:'长春这有山',floors:5,lng:125.3235,lat:43.8265,tag:'文旅/餐饮',addr:'朝阳区红旗街959号'},
+    {city:'长春',name:'长春万象城',floors:5,lng:125.3125,lat:43.8898,tag:'综合',addr:'南关区人民大街2019号'},
+    {city:'长春',name:'长春欧亚商都',floors:5,lng:125.3112,lat:43.8785,tag:'综合',addr:'朝阳区工农大路1128号'},
+    {city:'长春',name:'长春居然世界里',floors:5,lng:125.2885,lat:43.8325,tag:'综合',addr:'朝阳区硅谷大街4499号'},
+    // 昆明 4
+    {city:'昆明',name:'昆明恒隆广场',floors:6,lng:102.7135,lat:25.0378,tag:'综合',addr:'盘龙区东风东路21号'},
+    {city:'昆明',name:'昆明大悦城',floors:5,lng:102.7212,lat:25.0452,tag:'综合',addr:'西山区环城南路618号'},
+    {city:'昆明',name:'昆明同德广场',floors:5,lng:102.7155,lat:25.0585,tag:'综合',addr:'盘龙区北京路928号'},
+    {city:'昆明',name:'昆明park1903',floors:4,lng:102.6655,lat:24.9785,tag:'文旅/餐饮',addr:'西山区海宏路1号'},
+    // 福州 4
+    {city:'福州',name:'福州东百中心',floors:6,lng:119.2965,lat:26.0812,tag:'综合',addr:'鼓楼区八一七北路88号'},
+    {city:'福州',name:'福州万象城',floors:5,lng:119.3165,lat:26.0715,tag:'综合',addr:'台江区工业路378号'},
+    {city:'福州',name:'福州金融街万达',floors:4,lng:119.2985,lat:26.0525,tag:'综合',addr:'台江区金融街万达广场'},
+    {city:'福州',name:'福州仓山万达广场',floors:5,lng:119.2625,lat:26.0325,tag:'综合',addr:'仓山区浦上大道272号'},
+    // 厦门 4
+    {city:'厦门',name:'厦门万象城',floors:5,lng:118.1075,lat:24.4875,tag:'综合',addr:'思明区湖滨东路189号'},
+    {city:'厦门',name:'厦门SM城市广场',floors:5,lng:118.1285,lat:24.4985,tag:'综合',addr:'思明区嘉禾路399号'},
+    {city:'厦门',name:'厦门宝龙一城',floors:5,lng:118.1485,lat:24.4755,tag:'综合',addr:'思明区金山路1号'},
+    {city:'厦门',name:'厦门海上世界',floors:5,lng:118.0585,lat:24.5058,tag:'文旅/餐饮',addr:'湖里区东渡路108号'},
+    // 石家庄 4
+    {city:'石家庄',name:'石家庄万象城',floors:5,lng:114.4865,lat:38.0425,tag:'综合',addr:'桥西区中山路与维明街交口'},
+    {city:'石家庄',name:'石家庄勒泰中心',floors:5,lng:114.4835,lat:38.0462,tag:'综合',addr:'桥东区中山路与栗康街交口'},
+    {city:'石家庄',name:'石家庄先天下广场',floors:5,lng:114.4925,lat:38.0415,tag:'综合',addr:'长安区中山路与育才街交口'},
+    {city:'石家庄',name:'石家庄北国商城',floors:6,lng:114.4832,lat:38.0485,tag:'综合',addr:'桥西区中山路188号'},
+    // 南昌 4
+    {city:'南昌',name:'南昌武商MALL',floors:5,lng:115.8655,lat:28.6825,tag:'综合',addr:'东湖区八一大道888号'},
+    {city:'南昌',name:'南昌红谷滩万达',floors:5,lng:115.7812,lat:28.6785,tag:'综合',addr:'红谷滩区会展路999号'},
+    {city:'南昌',name:'南昌铜锣湾T16 Mall',floors:5,lng:115.8535,lat:28.6855,tag:'综合',addr:'红谷滩区庐山南大道369号'},
+    {city:'南昌',name:'南昌百盛购物中心',floors:4,lng:115.8578,lat:28.6785,tag:'综合',addr:'东湖区中山路65号'},
+    // 贵阳 4
+    {city:'贵阳',name:'贵阳花果园购物中心',floors:5,lng:106.7125,lat:26.5655,tag:'综合',addr:'南明区花果园大街1号'},
+    {city:'贵阳',name:'贵阳世纪金源购物中心',floors:5,lng:106.6235,lat:26.6085,tag:'综合',addr:'观山湖区金阳南路298号'},
+    {city:'贵阳',name:'贵阳国贸逸天城',floors:4,lng:106.7215,lat:26.5875,tag:'综合',addr:'云岩区人民大道28号'},
+    {city:'贵阳',name:'贵阳万象汇',floors:5,lng:106.6985,lat:26.5975,tag:'综合',addr:'观山湖区林城东路与长岭路交口'},
+    // 太原 4
+    {city:'太原',name:'太原北美N1',floors:5,lng:112.5512,lat:37.8775,tag:'综合',addr:'小店区晋阳街138号'},
+    {city:'太原',name:'太原华润万象城',floors:5,lng:112.5485,lat:37.8525,tag:'综合',addr:'迎泽区长风商务区'},
+    {city:'太原',name:'太原茂业天地',floors:6,lng:112.5625,lat:37.8715,tag:'综合',addr:'小店区亲贤北街79号'},
+    {city:'太原',name:'太原万达广场',floors:5,lng:112.5478,lat:37.9025,tag:'综合',addr:'杏花岭区解放路175号'},
+    // 兰州 4
+    {city:'兰州',name:'兰州中心',floors:6,lng:103.8425,lat:36.0612,tag:'综合',addr:'七里河区西站西路1号'},
+    {city:'兰州',name:'兰州国芳百货',floors:5,lng:103.8325,lat:36.0582,tag:'综合',addr:'城关区东方红广场西侧'},
+    {city:'兰州',name:'兰州万达城',floors:5,lng:103.7985,lat:36.0525,tag:'综合',addr:'七里河区万达茂'},
+    {city:'兰州',name:'兰州欣大百货',floors:5,lng:103.8255,lat:36.0545,tag:'综合',addr:'城关区张掖路139号'},
+];
+
+// ── Search dispatch: online (Amap live) or local offline DB ──
+function searchMall() {
+    if (mallSource === 'online' && mapObj && placeSearch) {
+        searchMallOnline();
+    } else {
+        searchMallLocal();
+    }
+}
+
+function setMallSource(src) {
+    mallSource = src;
+    document.querySelectorAll('#mallSrcToggle .src-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.src === src));
+    const r = document.getElementById('mallSearchResults');
+    r.style.display = 'none'; r.innerHTML = '';
+    const inp = document.getElementById('mallSearchInput');
+    inp.placeholder = src === 'online' ? '商场名/品牌，留空搜『商场』' : '输入商场名…';
+    if (src === 'online' && (!mapObj || !placeSearch)) {
+        setSt('地图未就绪，在线搜索暂不可用（已回退本地库）', 'info');
+    }
+}
+
+// ── Online search via Amap PlaceSearch (malls with real data) ──
+function searchMallOnline() {
+    const q = document.getElementById('mallSearchInput').value.trim();
+    const city = document.getElementById('citySelect').value;
+    const resultsEl = document.getElementById('mallSearchResults');
+    resultsEl.style.display = 'block';
+    resultsEl.innerHTML = '<div class="mall-loading">🔍 正在搜索高德地图…</div>';
+    const kw = q || '商场';
+    try {
+        const opts = { pageSize: 20, extensions: 'all' };
+        if (city) opts.city = city;
+        // When just browsing (no keyword), bias toward shopping malls;
+        // when a name is typed, search broadly so the exact mall is found.
+        if (!q) opts.type = '购物服务';
+        placeSearch.search(kw, opts, (status, result) => {
+            if (status === 'complete' && result.poiList && result.poiList.pois.length) {
+                lastAmapResults = result.poiList.pois;
+                renderAmapResults(lastAmapResults);
+            } else if (status === 'no_data') {
+                resultsEl.innerHTML = `<div class="mall-loading">在「${city || '全国'}」未找到「${kw}」相关商场</div>`;
+            } else {
+                resultsEl.innerHTML = '<div class="mall-loading">高德搜索失败，已切换本地库</div>';
+                searchMallLocal();
+            }
+        });
+    } catch (e) {
+        resultsEl.innerHTML = '<div class="mall-loading">高德搜索异常，已切换本地库</div>';
+        searchMallLocal();
+    }
+}
+
+function renderAmapResults(pois) {
+    const resultsEl = document.getElementById('mallSearchResults');
+    if (!pois.length) { resultsEl.innerHTML = '<div class="mall-loading">未找到相关商场</div>'; return; }
+    resultsEl.innerHTML = pois.map((p, i) => {
+        const loc = p.location || {};
+        const has = knownIndoor.has(p.id) ? ' <span class="mall-result-tag">✓ 有室内图</span>' : '';
+        const region = [p.pname, p.cityname, p.adname].filter(Boolean).join('');
+        return `
+        <div class="mall-result-item" onclick="loadAmapMall(${i})">
+            <div class="mall-result-name">${p.name || '未命名'}${has}</div>
+            <div class="mall-result-addr">📍 ${region}${p.address ? ' · ' + p.address : ''}</div>
+            <span class="mall-result-tag">高德POI · ${p.cityname || p.pname || '全国'}</span>
+        </div>`;
+    }).join('');
+}
+
+// Load a mall found via Amap live search: show its REAL indoor map if available
+function loadAmapMall(i) {
+    const poi = lastAmapResults[i];
+    if (!poi) return;
+    const resultsEl = document.getElementById('mallSearchResults');
+    resultsEl.style.display = 'none';
+    document.getElementById('mallSearchInput').value = poi.name || '';
+    document.querySelectorAll('.bld-item').forEach(e => e.classList.remove('active'));
+
+    const loc = poi.location || {};
+    const lng = (typeof loc.lng === 'number') ? loc.lng : (loc.getLng ? loc.getLng() : null);
+    const lat = (typeof loc.lat === 'number') ? loc.lat : (loc.getLat ? loc.getLat() : null);
+    if (lng == null || lat == null) { setSt('该商场缺少坐标信息', 'err'); return; }
+
+    document.getElementById('bldName').textContent = poi.name || '商场';
+    currentBldId = poi.id;
+    currentBldLngLat = [lng, lat];
+    currentRealFloors = [];   // reset until we confirm real indoor data
+
+    if (mapObj) { mapObj.setCenter(currentBldLngLat); mapObj.setZoom(18); }
+
+    if (indoorPlugin) {
+        try { indoorPlugin.showIndoorMap(poi.id, 0); } catch (e) {}
+        setMode('amap');
+        setSt('🛰️ 正在加载 ' + (poi.name || '商场') + ' 的高德室内图…', 'load');
+        setTimeout(() => {
+            const bid = (typeof indoorPlugin.getSelectedBuildingId === 'function')
+                ? indoorPlugin.getSelectedBuildingId() : null;
+            if (bid && bid === poi.id) {
+                knownIndoor.add(poi.id);
+                const b = (typeof indoorPlugin.getSelectedBuilding === 'function')
+                    ? indoorPlugin.getSelectedBuilding() : null;
+                if (b && b.floors && b.floors.length) renderRealFloors(b);
+                setSt('✅ 已加载 ' + (b && b.name ? b.name : poi.name) +
+                    ' 室内图（' + (b && b.floors ? b.floors.length : 0) + ' 层）', 'ok');
+            } else {
+                setSt('⚠️ ' + (poi.name || '该商场') + ' 在高德中暂无室内图数据，已定位到地图位置', 'info');
+            }
+        }, 800);
+    } else {
+        setSt('已定位：' + (poi.name || '商场'), 'ok');
+    }
+}
+
+// Restore the synthetic (demo) floor list after leaving a real Amap mall
+function restoreSyntheticFloors() {
+    if (demoFloors && demoFloors.length) {
+        currentFloors = demoFloors;
+        renderFloorUI(demoFloors);
+    }
+}
+
+// Render the REAL floor list returned by Amap indoor building
+function renderRealFloors(building) {
+    const fls = building.floors || [];
+    if (!fls.length) return;
+    currentRealFloors = fls;
+    currentFloors = fls.map(f => ({ name: f.floor || f.name }));
+    const el = document.getElementById('floorScroll');
+    el.innerHTML = fls.map((f, i) => {
+        const key = f.floor || f.name;
+        const label = f.name || f.floor;
+        const icon = FLOOR_ICONS[key] || '🏬';
+        return `<div class="floor-chip ${i === 0 ? 'active' : ''}" data-f="${key}" onclick="switchFloor('${key}')">
+            <span class="f-icon">${icon}</span>
+            <span class="f-name">${label}</span>
+        </div>`;
+    }).join('');
+    document.getElementById('floorCard').style.display = 'block';
+}
+
+// ── Local offline DB search (fallback / no-key demo mode) ──
+function searchMallLocal() {
+    const q = document.getElementById('mallSearchInput').value.trim().toLowerCase();
+    const city = document.getElementById('citySelect').value;
+    const resultsEl = document.getElementById('mallSearchResults');
+    if (!q) { resultsEl.style.display = 'none'; return; }
+    let pool = city ? MALL_DB.filter(m => m.city === city) : MALL_DB;
+    const hits = pool.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        m.tag.toLowerCase().includes(q) ||
+        m.addr.toLowerCase().includes(q)
+    );
+    resultsEl.style.display = 'block';
+    if (!hits.length) {
+        const hint = city ? `在 ${city} 未找到，试试全国` : '未找到匹配商场';
+        resultsEl.innerHTML = `<div class="mall-loading" style="color:#6b7280">${hint}</div>`;
+        return;
+    }
+    resultsEl.innerHTML = hits.map(m => `
+        <div class="mall-result-item" onclick="selectMallResult(null,'${m.name}',${m.lng},${m.lat},'${m.addr}','${m.city}','${m.floors}层')">
+            <div class="mall-result-name">${m.name}</div>
+            <div class="mall-result-addr">📍 ${m.addr}</div>
+            <span class="mall-result-tag">${m.city} · ${m.floors}层 · ${m.tag}</span>
+        </div>
+    `).join('');
+}
+
+function selectMallResult(id, name, lng, lat, addr, city, floors) {
+    document.getElementById('mallSearchResults').style.display = 'none';
+    document.getElementById('mallSearchInput').value = name;
+    document.querySelectorAll('.bld-item').forEach(item => item.classList.remove('active'));
+    document.getElementById('bldName').textContent = name;
+    currentBldId = id;
+    currentRealFloors = [];   // local result has no real Amap indoor floors attached
+    restoreSyntheticFloors();
+    currentBldLngLat = [parseFloat(lng), parseFloat(lat)];
+    if (mapObj) { mapObj.setCenter(currentBldLngLat); mapObj.setZoom(18); }
+    setSt(`已定位：${city} · ${name}`, 'ok');
+}
+
+function onCityChange(city) {
+    if (mallSource === 'online') {
+        // Live-list malls in the chosen city (or nationwide if none)
+        searchMallOnline();
+    } else if (document.getElementById('mallSearchInput').value.trim()) {
+        searchMallLocal();
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT: THREE.JS
+// ══════════════════════════════════════════════════════════════
+function initThree() {
+    console.log('[initThree] step 0 - start');
+    if (scene3) return; // already initialized
+    threeCanvas = document.getElementById('threeCanvas');
+    console.log('[initThree] step 1 - canvas:', !!threeCanvas);
+
+    const w = () => threeCanvas.clientWidth || 800;
+    const h = () => threeCanvas.clientHeight || 600;
+
+    scene3 = new THREE.Scene();
+    camera3 = new THREE.PerspectiveCamera(50, w()/h(), 0.1, 5000);
+
+    renderer3 = new THREE.WebGLRenderer({
+        canvas: threeCanvas,
+        antialias: true,
+        alpha: true,
+        premultipliedAlpha: false
+    });
+    console.log('[initThree] step 2 - renderer created:', !!renderer3);
+    renderer3.setSize(w(), h());
+    renderer3.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer3.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer3.toneMappingExposure = 1.1;
+    renderer3.shadowMap.enabled = true;
+    renderer3.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    console.log('[initThree] step 3 - setting up lights');
+    // Lights
+    scene3.add(new THREE.AmbientLight(0x6080a0, 1.0));
+    const sun = new THREE.DirectionalLight(0xffeedd, 2.0);
+    sun.position.set(80, 120, 60);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 500;
+    sun.shadow.camera.left = -150;
+    sun.shadow.camera.right = 150;
+    sun.shadow.camera.top = 150;
+    sun.shadow.camera.bottom = -150;
+    scene3.add(sun);
+    scene3.add(new THREE.DirectionalLight(0x7b2cbf, 0.5).add(new THREE.Object3D()));
+
+    // Fill light
+    const fill = new THREE.DirectionalLight(0x4488bb, 0.4);
+    fill.position.set(-50, 30, -40);
+    scene3.add(fill);
+
+    // Mouse controls
+    threeCanvas.addEventListener('mousedown', e => {
+        if (viewMode === 'amap') return;
+        isDrag = true;
+        mouseMoved = false;
+        mouseDownX = e.clientX;
+        mouseDownY = e.clientY;
+        lastM = { x: e.clientX, y: e.clientY };
+        threeCanvas.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', e => {
+        if (!isDrag || viewMode === 'amap') return;
+        const dx = e.clientX - lastM.x;
+        const dy = e.clientY - lastM.y;
+        if (Math.abs(e.clientX - mouseDownX) > 5 || Math.abs(e.clientY - mouseDownY) > 5) mouseMoved = true;
+        tSpherical.t -= dx * 0.008;
+        tSpherical.p = Math.max(0.1, Math.min(Math.PI/2 - 0.05, tSpherical.p + dy * 0.008));
+        lastM = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('mouseup', () => {
+        isDrag = false;
+        threeCanvas.style.cursor = 'grab';
+    });
+    let mouseMoved = false;
+    let lastMouseX = 0, lastMouseY = 0;
+    let mouseDownX = 0, mouseDownY = 0;
+    threeCanvas.addEventListener('wheel', e => {
+        if (viewMode === 'amap') return;
+        e.preventDefault();
+        tSpherical.r = Math.max(20, Math.min(600, tSpherical.r + e.deltaY * 0.3));
+    }, { passive: false });
+
+    threeCanvas.addEventListener('click', e => {
+        if (viewMode === 'amap' || !scene3) return;
+        if (mouseMoved) { mouseMoved = false; return; }  // ignore click after drag
+        // Raycast to floor to pick POI
+        const rect = threeCanvas.getBoundingClientRect();
+        const mouse = new THREE.Vector2(
+            ((e.clientX - rect.left) / rect.width) * 2 - 1,
+            -((e.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, camera3);
+        const intersects = raycaster.intersectObjects(poiSprites, false);
+        if (intersects.length > 0) {
+            const sp = intersects[0].object;
+            if (sp.userData.poi) {
+                onPoiClick3D(sp.userData.poi);
+                return;
+            }
+        }
+        // Click on floor plane to deselect
+        onFloorClick3D();
+    });
+
+    // Touch controls
+    let lastTouches = null;
+    threeCanvas.addEventListener('touchstart', e => {
+        if (viewMode === 'amap') return;
+        if (e.touches.length === 1) {
+            isDrag = true;
+            lastM = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (e.touches.length === 2) {
+            isDrag = false;
+            lastTouches = [{ x: e.touches[0].clientX, y: e.touches[0].clientY }, { x: e.touches[1].clientX, y: e.touches[1].clientY }];
+        }
+    }, { passive: true });
+    window.addEventListener('touchmove', e => {
+        if (viewMode === 'amap' || !isDrag) return;
+        if (e.touches.length === 1) {
+            const dx = e.touches[0].clientX - lastM.x;
+            const dy = e.touches[0].clientY - lastM.y;
+            tSpherical.t -= dx * 0.01;
+            tSpherical.p = Math.max(0.1, Math.min(Math.PI/2 - 0.05, tSpherical.p + dy * 0.01));
+            lastM = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+    }, { passive: true });
+    window.addEventListener('touchend', () => { isDrag = false; lastTouches = null; });
+
+    window.addEventListener('resize', () => {
+        if (!renderer3) return;
+        const cw = w3(), ch = h3();
+        renderer3.setSize(cw, ch);
+        if (camera3) { camera3.aspect = cw / ch; camera3.updateProjectionMatrix(); }
+    });
+
+    threeCanvas.style.cursor = 'grab';
+    console.log('[initThree] step 4 - about to start loop, animId:', animId);
+    animId = requestAnimationFrame(loop);
+    console.log('[initThree] step 5 - loop started, scene children:', scene3.children.length);
+}
+
+function loop() {
+    animId = requestAnimationFrame(loop);
+    spherical.t = lerp(spherical.t, tSpherical.t, 0.08);
+    spherical.p = lerp(spherical.p, tSpherical.p, 0.08);
+    spherical.r = lerp(spherical.r, tSpherical.r, 0.08);
+
+    const { t, p, r } = spherical;
+    camera3.position.set(
+        center3.x + r * Math.sin(p) * Math.cos(t),
+        center3.y + r * Math.cos(p),
+        r * Math.sin(p) * Math.sin(t)
+    );
+    camera3.lookAt(center3.x, center3.y, 0);
+
+    if (!renderer3 || !scene3 || !camera3) return;
+    const cw = w3(), ch = h3();
+    if (renderer3.domElement.width !== cw || renderer3.domElement.height !== ch) {
+        renderer3.setSize(cw, ch);
+        camera3.aspect = cw / ch;
+        camera3.updateProjectionMatrix();
+    }
+    renderer3.render(scene3, camera3);
+}
+const w3 = () => threeCanvas?.clientWidth || 800;
+const h3 = () => threeCanvas?.clientHeight || 600;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// ══════════════════════════════════════════════════════════════
+//  BIND MAP EVENTS (when map is live)
+// ══════════════════════════════════════════════════════════════
+function bindMapEvents() {
+    if (!mapObj) return;
+    mapObj.on('click', e => {
+        if (viewMode !== 'amap') return;
+        // Click on marker handled by marker's click event
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DEMO MODE (no map key needed)
+// ══════════════════════════════════════════════════════════════
+function _enterDemoMode(msg) {
+    // Idempotent – ignore if already in demo mode
+    if (usingDemoData) {
+        console.log('[demo] already running, skipping duplicate call');
+        return;
+    }
+    setSt(msg || '进入演示模式…', 'load');
+    document.getElementById('demoNotice').style.display = 'block';
+    usingDemoData = true;
+
+    // initThree() must run first (it also calls applyGeoJsonToScene internally
+    // via _enterDemoMode → but here we do it directly to keep order explicit)
+    initThree();   // sets up scene3, renderer, camera
+    setSt('加载建筑数据…', 'load');
+    applyGeoJsonToScene(DEMO_GEOJSON);  // currentFloor is set here
+    setMode('three');
+    setSt('🎉 演示就绪！国贸中心 · 7 层 · 21 店铺', 'ok');
+    document.getElementById('floorCard').style.display = 'block';
+}
+
+function skipKey() {
+    document.getElementById('keyGuide').style.display = 'none';
+    _enterDemoMode('跳过 Key 配置，直接演示…');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  APPLY GeoJSON → Three.js Scene
+// ══════════════════════════════════════════════════════════════
+function applyGeoJsonToScene(data) {
+    currentGeoData = data;
+    clearScene3D();
+
+    // Build floors
+    const floorMap = new Map();
+    const features = data.features || [];
+
+    features.forEach(f => {
+        if (!f.properties?.name) return;
+        const fn = f.properties.floor || 'L1';
+        if (!floorMap.has(fn)) floorMap.set(fn, []);
+        floorMap.get(fn).push(f);
+    });
+
+    // Sort floors by display order
+    const orderedFloors = [];
+    FLOOR_ORDER.forEach(fn => {
+        if (floorMap.has(fn)) {
+            const idx = FLOOR_ORDER.indexOf(fn);
+            orderedFloors.push({ name: fn, idx, features: floorMap.get(fn) });
+        }
+    });
+    // Add any remaining floors
+    floorMap.forEach((v, k) => {
+        if (!FLOOR_ORDER.includes(k)) {
+            orderedFloors.push({ name: k, idx: FLOOR_ORDER.length, features: v });
+        }
+    });
+
+    if (orderedFloors.length === 0) {
+        orderedFloors.push({ name: 'L1', idx: 3, features: [] });
+    }
+
+    currentFloors = orderedFloors;
+    currentFloor = orderedFloors[0]?.name;
+    if (!demoFloors) demoFloors = orderedFloors;   // remember the initial synthetic floors
+
+    // Compute building dimensions from POI spread
+    if (features.length > 0) {
+        let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+        features.forEach(f => {
+            if (f.geometry?.type === 'Point') {
+                const [lng, lat] = f.geometry.coordinates;
+                if (lng < minLng) minLng = lng;
+                if (lng > maxLng) maxLng = lng;
+                if (lat < minLat) minLat = lat;
+                if (lat > maxLat) maxLat = lat;
+            }
+        });
+        if (isFinite(minLng)) {
+            const wLng = (maxLng - minLng) * M_PER_LNG;
+            const dLat = (maxLat - minLat) * M_PER_LAT;
+            bld.width = Math.max(80, Math.round(wLng * 1.6));  // pad 30% each side
+            bld.depth = Math.max(60, Math.round(dLat * 1.6));
+            // Update sliders to match real data
+            document.getElementById('pWidth').value = bld.width;
+            document.getElementById('pWidthVal').textContent = bld.width + 'm';
+            document.getElementById('pDepth').value = bld.depth;
+            document.getElementById('pDepthVal').textContent = bld.depth + 'm';
+        }
+    }
+
+    bld.floors = orderedFloors.length;
+    document.getElementById('pFloors').value = bld.floors;
+    document.getElementById('pFloorsVal').textContent = bld.floors + ' 层';
+
+    // Build 3D floors
+    orderedFloors.forEach((fdata, fi) => {
+        buildFloorGroup(fdata.name, fi, fdata.features);
+    });
+
+    // Center camera on middle floor
+    const midFi = Math.floor(orderedFloors.length / 2);
+    center3 = { x: 0, y: midFi * bld.floorH };
+    spherical = { t: Math.PI/4, p: Math.PI/3, r: bld.width * 1.2 };
+    tSpherical = { ...spherical };
+
+    renderFloorUI(orderedFloors);
+    document.getElementById('floorCard').style.display = 'block';
+
+    // Update building info in header
+    document.getElementById('poiCountTag').textContent = `${features.length} POI`;
+    document.getElementById('bldName').textContent = data.metadata?.building_name || '室内建筑';
+
+    if (midFi < orderedFloors.length) {
+        threeSwitchFloor(orderedFloors[midFi].name);
+    }
+}
+
+function buildFloorGroup(floorName, fi, features) {
+    const g = new THREE.Group();
+    const FH = bld.floorH;
+    const W = bld.width, D = bld.depth;
+    const y = fi * FH;
+
+    // Floor slab
+    const slabMat = new THREE.MeshStandardMaterial({
+        color: bld.intCol || '#0a1628',
+        metalness: 0.05,
+        roughness: 0.9,
+        transparent: true,
+        opacity: 0.85
+    });
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(W, 0.2, D), slabMat);
+    slab.position.set(0, y, 0);
+    slab.receiveShadow = true;
+    slab.userData = { fi, name: floorName };
+    g.add(slab);
+
+    // Outer boundary outline
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.5 });
+    const edgeGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-W/2, y+0.1, -D/2),
+        new THREE.Vector3( W/2, y+0.1, -D/2),
+        new THREE.Vector3( W/2, y+0.1,  D/2),
+        new THREE.Vector3(-W/2, y+0.1,  D/2),
+        new THREE.Vector3(-W/2, y+0.1, -D/2),
+    ]);
+    g.add(new THREE.Line(edgeGeo, edgeMat));
+
+    // Grid
+    const gridHelper = new THREE.GridHelper(Math.min(W, D), 10, 0x1a3a5c, 0x0d2035);
+    gridHelper.position.y = y + 0.3;
+    gridHelper.material.transparent = true;
+    gridHelper.material.opacity = 0.25;
+    g.add(gridHelper);
+
+    // POI boxes (storefronts)
+    features.forEach(feat => {
+        if (feat.geometry?.type !== 'Point') return;
+        const [lng, lat] = feat.geometry.coordinates;
+        const p = feat.properties;
+        const col = p.color || FCOLS[p.category] || '#a855f7';
+        const { x: lx, z: lz } = llToWorld(lng, lat);
+
+        // Clamp to building footprint
+        const bx = Math.max(-W/2 + 2, Math.min(W/2 - 2, lx));
+        const bz = Math.max(-D/2 + 2, Math.min(D/2 - 2, lz));
+
+        // Store box
+        const bh = p.category === 'parking' ? FH * 0.6 : FH * 0.55;
+        const bw = p.category === 'service' ? 3 : 6;
+        const bd = p.category === 'service' ? 3 : 5;
+        const boxMat = new THREE.MeshStandardMaterial({
+            color: col,
+            metalness: 0.2,
+            roughness: 0.7,
+            transparent: true,
+            opacity: 0.85
+        });
+        const box = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), boxMat);
+        box.position.set(bx, y + bh/2, bz);
+        box.castShadow = true;
+        box.receiveShadow = true;
+        g.add(box);
+
+        // POI label sprite
+        const sp = makePoiSprite(p.name, col);
+        sp.position.set(bx, y + bh + 1.5, bz);
+        sp.scale.set(8, 2.5, 1);
+        sp.userData = { floorIndex: fi, poi: p, floorName };
+        g.add(sp);
+        poiSprites.push(sp);
+    });
+
+    // Floor name tag
+    const tagSp = makeFloorSprite(floorName);
+    tagSp.position.set(-W/2 + 4, y + FH + 1, -D/2 + 3);
+    tagSp.scale.set(6, 2, 1);
+    g.add(tagSp);
+
+    scene3.add(g);
+    floorGroups.push({ name: floorName, group: g, fi });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FLOOR SWITCH
+// ══════════════════════════════════════════════════════════════
+function threeSwitchFloor(n) {
+    const fi = floorGroups.findIndex(f => f.name === n);
+    if (fi < 0) return;
+    floorGroups.forEach(({ group }, i) => {
+        const dist = Math.abs(i - fi);
+        group.visible = dist <= 1;
+        group.traverse(c => {
+            if (c.isMesh && c.material) {
+                c.material.opacity = dist === 0 ? 0.95 : dist === 1 ? 0.4 : 0.08;
+                c.material.transparent = true;
+            }
+        });
+    });
+    poiSprites.forEach(s => {
+        s.visible = Math.abs(s.userData.floorIndex - fi) <= 1;
+    });
+    center3.y = fi * bld.floorH;
+    document.getElementById('floorTag').textContent = `📍 ${n}`;
+}
+
+function syncFloorUI(n) {
+    document.querySelectorAll('.floor-chip').forEach(e => e.classList.toggle('active', e.dataset.f === n));
+    document.querySelectorAll('.fc-btn').forEach(e => e.classList.toggle('active', e.dataset.f === n));
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FLOOR UI
+// ══════════════════════════════════════════════════════════════
+function renderFloorUI(floors) {
+    const el = document.getElementById('floorScroll');
+    el.innerHTML = floors.map((f, i) => {
+        const icon = FLOOR_ICONS[f.name] || f.name;
+        const count = currentGeoData?.features?.filter(x => x.properties?.floor === f.name).length || 0;
+        return `<div class="floor-chip ${i === 0 ? 'active' : ''}" data-f="${f.name}" onclick="switchFloor('${f.name}')">
+            <span class="f-icon">${icon}</span>
+            <span class="f-name">${f.name}</span>
+            <span class="f-count">${count} 店</span>
+        </div>`;
+    }).join('');
+}
+
+function switchFloor(n) {
+    currentFloor = n;
+    syncFloorUI(n);
+    if (viewMode !== 'amap') threeSwitchFloor(n);
+    // If indoor plugin loaded
+    if (indoorPlugin && mapObj) {
+        if (currentRealFloors && currentRealFloors.length) {
+            try { indoorPlugin.showFloor(n); } catch(e) {}
+        } else {
+            try { indoorPlugin.showIndoorMap(currentBldId, getFloorIndex(n)); } catch(e) {}
+        }
+    }
+}
+
+function getFloorIndex(fn) {
+    const idx = FLOOR_ORDER.indexOf(fn);
+    return idx >= 0 ? idx : 0;
+}
+
+function fcMove(dir) {
+    if (!currentFloor) return;
+    const idx = currentFloors.findIndex(f => f.name === currentFloor);
+    const ni = Math.max(0, Math.min(currentFloors.length - 1, idx + dir));
+    switchFloor(currentFloors[ni].name);
+}
+
+function fcReset() {
+    center3 = { x: 0, y: (currentFloors.findIndex(f => f.name === currentFloor) || 0) * bld.floorH };
+    spherical = { t: Math.PI/4, p: Math.PI/3, r: bld.width * 1.2 };
+    tSpherical = { ...spherical };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SPRITES
+// ══════════════════════════════════════════════════════════════
+function makePoiSprite(text, color) {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 128;
+    const ctx = c.getContext('2d');
+    // Background
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.beginPath();
+    roundRect(ctx, 0, 0, 512, 128, 16);
+    ctx.fill();
+    // Border
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    roundRect(ctx, 0, 0, 512, 128, 16);
+    ctx.stroke();
+    // Text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Truncate if too long
+    let t = text;
+    while (ctx.measureText(t).width > 460 && t.length > 2) t = t.slice(0, -1);
+    ctx.fillText(t, 256, 64);
+    const tex = new THREE.CanvasTexture(c);
+    return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+}
+
+function makeFloorSprite(text) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(0,212,255,0.85)';
+    ctx.beginPath();
+    roundRect(ctx, 0, 0, 256, 64, 12);
+    ctx.fill();
+    ctx.fillStyle = '#000d1a';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 32);
+    const tex = new THREE.CanvasTexture(c);
+    return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  VIEW MODES
+// ══════════════════════════════════════════════════════════════
+function setMode(m) {
+    viewMode = m;
+    const pill = document.getElementById('modePill');
+    const labels = { amap: 'AMap 地图', three: '3D 建筑', fusion: '融合视图' };
+
+    document.getElementById('threeCanvas').style.opacity = m === 'amap' ? '0' : (m === 'fusion' ? '0.75' : '1');
+    document.getElementById('threeCanvas').classList.toggle('active', m !== 'amap');
+    if (pill) pill.textContent = labels[m] || 'AMap 地图';
+
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('mb-' + m)?.classList.add('active');
+
+    if (m === 'amap') {
+        document.getElementById('threeCanvas').style.pointerEvents = 'none';
+        if (mapObj) {
+            try { mapObj.setPitch(45); } catch(e) {}
+            try { mapObj.setZoom(18); } catch(e) {}
+        }
+    } else if (m === 'three') {
+        document.getElementById('threeCanvas').style.pointerEvents = 'all';
+        if (mapObj) { try { mapObj.setPitch(0); } catch(e) {} }
+        // Close editor when entering 3D
+        if (edOpen) {
+            document.getElementById('edPanel')?.classList.remove('open');
+            document.getElementById('edToggleBtn')?.classList.remove('active');
+            document.body.classList.remove('editor-open');
+        }
+    } else { // fusion
+        document.getElementById('threeCanvas').style.pointerEvents = 'none';
+        if (mapObj) { try { mapObj.setPitch(60); } catch(e) {} }
+    }
+
+    setSt('模式: ' + (labels[m] || m), 'ok');
+}
+
+function setAngle(type) {
+    const presets = {
+        top:   { t: 0,           p: 0.12,   r: bld.width * 1.5 },
+        iso:   { t: Math.PI/4,  p: Math.PI/3, r: bld.width * 1.2 },
+        front: { t: 0,          p: Math.PI/2.2, r: bld.depth * 1.2 },
+        side:  { t: Math.PI/2,  p: Math.PI/2.2, r: bld.width * 1.2 }
+    };
+    const preset = presets[type] || presets.iso;
+    Object.assign(tSpherical, preset);
+    document.querySelectorAll('.angle-btn').forEach(b => b.classList.remove('active'));
+    event?.target?.classList?.add('active');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BUILDING PARAMS
+// ══════════════════════════════════════════════════════════════
+function updateBldParams() {
+    bld.floors = parseInt(document.getElementById('pFloors').value);
+    bld.floorH = parseFloat(document.getElementById('pFloorH').value);
+    bld.width = parseInt(document.getElementById('pWidth').value);
+    bld.depth = parseInt(document.getElementById('pDepth').value);
+    bld.extCol = document.getElementById('pExtCol').value;
+    bld.intCol = document.getElementById('pIntCol').value;
+
+    document.getElementById('pFloorsVal').textContent = bld.floors + ' 层';
+    document.getElementById('pFloorHVal').textContent = bld.floorH + 'm';
+    document.getElementById('pWidthVal').textContent = bld.width + 'm';
+    document.getElementById('pDepthVal').textContent = bld.depth + 'm';
+
+    if (currentGeoData) {
+        // Rebuild scene with new params
+        const savedData = currentGeoData;
+        clearScene3D();
+        applyGeoJsonToScene(savedData);
+    }
+}
+
+function resetBldParams() {
+    Object.assign(bld, BLD_DEF);
+    document.getElementById('pFloors').value = bld.floors;
+    document.getElementById('pFloorH').value = bld.floorH;
+    document.getElementById('pWidth').value = bld.width;
+    document.getElementById('pDepth').value = bld.depth;
+    document.getElementById('pExtCol').value = bld.extCol;
+    document.getElementById('pIntCol').value = bld.intCol;
+    updateBldParams();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  POI CLICK
+// ══════════════════════════════════════════════════════════════
+function onPoiClick3D(poi) {
+    showPoiInfo(poi);
+    switchFloor(poi.floor || 'L1');
+    if (mapObj) {
+        if (poi._lng !== undefined) {
+            mapObj.setCenter([poi._lng, poi._lat]);
+        }
+    }
+}
+
+function onFloorClick3D() {
+    document.getElementById('poiInfo').classList.remove('show');
+}
+
+function showPoiInfo(p) {
+    const cat = FCOLS[p.category] || '#a855f7';
+    document.getElementById('poiName').textContent = p.name || '--';
+    document.getElementById('poiAddr').textContent = `📍 ${p.floor || '未知楼层'} · ${p.brand || p.subcategory || p.category || '其他'}`;
+    const tagsEl = document.getElementById('poiTags');
+    const catLabel = { shopping:'购物', dining:'餐饮', entertainment:'娱乐', parking:'停车', service:'服务', area:'区域' }[p.category] || p.category || '其他';
+    tagsEl.innerHTML = `<span class="pi-tag" style="border:1px solid ${cat}33;color:${cat}">${catLabel}</span>` +
+        (p.brand ? `<span class="pi-tag">${p.brand}</span>` : '') +
+        (p.business_hours ? `<span class="pi-tag">${p.business_hours}</span>` : '');
+    document.getElementById('poiInfo').classList.add('show');
+    setTimeout(() => document.getElementById('poiInfo').classList.remove('show'), 6000);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════════════════
+function clearNav() {
+    navStart = null;
+    navEnd = null;
+    document.getElementById('navCard').style.display = 'none';
+    document.getElementById('navInfo').classList.remove('show');
+    document.getElementById('navTxt').textContent = '';
+    navMarkers.forEach(m => { if(mapObj) m.setMap(null); });
+    navMarkers = [];
+    if (navPath3D) { scene3.remove(navPath3D); navPath3D = null; }
+    navPath3DMarkers.forEach(m => scene3.remove(m));
+    navPath3DMarkers = [];
+}
+
+function drawNavPath3D(start, end) {
+    if (navPath3D) { scene3.remove(navPath3D); }
+    navPath3DMarkers.forEach(m => scene3.remove(m));
+    navPath3DMarkers = [];
+
+    const startFloorIdx = FLOOR_ORDER.indexOf(start.floor);
+    const endFloorIdx = FLOOR_ORDER.indexOf(end.floor);
+    const points = [];
+
+    const { x: sx, z: sz } = llToWorld(start._lng, start._lat);
+    const { x: ex, z: ez } = llToWorld(end._lng, end._lat);
+
+    // Start position
+    points.push(new THREE.Vector3(sx, startFloorIdx * bld.floorH + 1, sz));
+
+    if (startFloorIdx !== endFloorIdx) {
+        // Find elevator
+        const elevator = currentGeoData?.features?.find(f =>
+            f.properties?.category === 'service' && f.properties?.subcategory === 'elevator'
+        );
+        if (elevator) {
+            const { x: elx, z: elz } = llToWorld(elevator.geometry.coordinates[0], elevator.geometry.coordinates[1]);
+            points.push(new THREE.Vector3(elx, startFloorIdx * bld.floorH + 1, elz));
+            points.push(new THREE.Vector3(elx, endFloorIdx * bld.floorH + 1, elz));
+        }
+    }
+
+    points.push(new THREE.Vector3(ex, endFloorIdx * bld.floorH + 1, ez));
+
+    if (points.length >= 2) {
+        // Path line
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x00d4ff, linewidth: 2 });
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+        navPath3D = new THREE.Line(lineGeo, lineMat);
+        scene3.add(navPath3D);
+
+        // Animated dots along path
+        const dotGeo = new THREE.SphereGeometry(0.8, 8, 8);
+        points.forEach((pt, i) => {
+            const dotMat = new THREE.MeshBasicMaterial({ color: i === 0 ? 0x4ade80 : i === points.length - 1 ? 0xf87171 : 0x00d4ff, transparent: true, opacity: 0.8 });
+            const dot = new THREE.Mesh(dotGeo, dotMat);
+            dot.position.copy(pt);
+            scene3.add(dot);
+            navPath3DMarkers.push(dot);
+        });
+
+        document.getElementById('navTxt').textContent = `${start.name} → ${end.name}`;
+        document.getElementById('navInfo').classList.add('show');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SEARCH
+// ══════════════════════════════════════════════════════════════
+function doSearch() {
+    const q = document.getElementById('sInput').value.trim().toLowerCase();
+    const el = document.getElementById('sResults');
+    if (!q) { el.style.display = 'none'; return; }
+
+    // Search from current data first, then DEMO_GEOJSON as fallback
+    const allFeatures = [
+        ...(currentGeoData?.features || []),
+        ...(DEMO_GEOJSON?.features || [])
+    ];
+    // Deduplicate by id
+    const seen = new Set();
+    const uniqueFeatures = allFeatures.filter(f => {
+        if (seen.has(f.properties?.id)) return false;
+        seen.add(f.properties?.id);
+        return true;
+    });
+
+    const results = uniqueFeatures
+        .filter(f => {
+            const n = (f.properties?.name || '').toLowerCase();
+            const b = (f.properties?.brand || '').toLowerCase();
+            return n.includes(q) || b.includes(q);
+        })
+        .slice(0, 8);
+
+    if (results.length === 0) {
+        el.innerHTML = '<div style="font-size:11px;color:#6b7280;text-align:center;padding:8px;">无结果</div>';
+    } else {
+        el.innerHTML = results.map(r => {
+            const p = r.properties;
+            const col = p.color || FCOLS[p.category] || '#a855f7';
+            return `<div class="res-item" onclick="onSearchResultClick(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                <div class="res-name" style="display:flex;align-items:center;gap:5px;">
+                    <span style="width:6px;height:6px;border-radius:50%;background:${col};flex-shrink:0"></span>
+                    ${p.name}
+                </div>
+                <div class="res-meta">${p.floor || ''} ${p.brand || p.category || ''}</div>
+            </div>`;
+        }).join('');
+    }
+    el.style.display = 'flex';
+}
+
+function onSearchResultClick(p) {
+    document.getElementById('sResults').style.display = 'none';
+    document.getElementById('sInput').value = p.name;
+    switchFloor(p.floor || currentFloor);
+    showPoiInfo(p);
+    // Navigate camera to POI
+    if (p._lng !== undefined) {
+        center3.x = llToWorld(p._lng, p._lat).x;
+        center3.z = llToWorld(p._lng, p._lat).z;
+        tSpherical.r = 60;
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LOAD BUILDING
+// ══════════════════════════════════════════════════════════════
+function loadBld(el, id, name, lng, lat, addr) {
+    document.querySelectorAll('.bld-item').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('bldName').textContent = name;
+
+    currentBldId = id;
+    currentRealFloors = [];   // preset uses synthetic 3D building, not real indoor floors
+    restoreSyntheticFloors();
+    currentBldLngLat = [parseFloat(lng), parseFloat(lat)];
+
+    // Reload indoor map
+    if (indoorPlugin && mapObj) {
+        try { indoorPlugin.showIndoorMap(id, 0); } catch(e) {}
+        mapObj.setCenter(currentBldLngLat);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FILE UPLOAD
+// ══════════════════════════════════════════════════════════════
+function handleGeoJsonUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.metadata) {
+                currentBldLngLat = [data.metadata.center_lng || 116.4608, data.metadata.center_lat || 39.9097];
+                document.getElementById('bldName').textContent = data.metadata.building_name || '导入建筑';
+            }
+            // Attach world coords to each feature
+            (data.features || []).forEach(f => {
+                if (f.geometry?.type === 'Point') {
+                    f.properties._lng = f.geometry.coordinates[0];
+                    f.properties._lat = f.geometry.coordinates[1];
+                }
+            });
+            applyGeoJsonToScene(data);
+            setSt('GeoJSON 加载成功: ' + (data.features?.length || 0) + ' POI', 'ok');
+            setMode('three');
+        } catch(e) {
+            setSt('GeoJSON 解析失败: ' + e.message, 'err');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function loadBuiltInData() {
+    // Attach coords to demo data
+    (DEMO_GEOJSON.features || []).forEach(f => {
+        if (f.geometry?.type === 'Point') {
+            f.properties._lng = f.geometry.coordinates[0];
+            f.properties._lat = f.geometry.coordinates[1];
+        }
+    });
+    applyGeoJsonToScene(DEMO_GEOJSON);
+    setSt('内置演示数据已加载！', 'ok');
+    setMode('three');
+    document.getElementById('demoNotice').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CLEAR SCENE
+// ══════════════════════════════════════════════════════════════
+function clearScene3D() {
+    floorGroups.forEach(({ group }) => {
+        group.traverse(c => {
+            if (c.geometry) c.geometry.dispose();
+            if (c.material) {
+                if (Array.isArray(c.material)) c.material.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+                else { if (c.material.map) c.material.map.dispose(); c.material.dispose(); }
+            }
+        });
+        scene3.remove(group);
+    });
+    floorGroups = [];
+
+    poiSprites.forEach(s => {
+        scene3.remove(s);
+        if (s.material.map) s.material.map.dispose();
+        s.material.dispose();
+    });
+    poiSprites = [];
+
+    clearNav();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  POI CLICK on map markers
+// ══════════════════════════════════════════════════════════════
+function addGeoMarker(feat) {
+    if (!mapObj || feat.geometry?.type !== 'Point') return;
+    const [lng, lat] = feat.geometry.coordinates;
+    const p = feat.properties;
+    const col = p.color || FCOLS[p.category] || '#a855f7';
+
+    const marker = new AMap.Marker({
+        position: [lng, lat],
+        title: p.name,
+        icon: new AMap.Icon({
+            size: new AMap.Size(24, 24),
+            image: 'data:image/svg+xml,' + encodeURIComponent(
+                `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="${col}" opacity="0.9"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="10">${(p.type_icon || '📍').charAt(0)}</text></svg>`
+            ),
+            imageSize: new AMap.Size(24, 24)
+        }),
+        extData: p
+    });
+
+    const info = new AMap.InfoWindow({
+        content: `<div style="padding:8px 12px;min-width:160px;background:rgba(6,6,15,.95);border:1px solid rgba(255,255,255,.1);border-radius:8px;">
+            <strong style="font-size:13px;color:#fff">${p.name || '未命名'}</strong><br>
+            <span style="font-size:11px;color:#9ca3af">📍 ${p.floor || '未知楼层'} · ${p.brand || p.category || ''}</span>
+            ${p.business_hours ? `<br><span style="font-size:10px;color:#6b7280">⏰ ${p.business_hours}</span>` : ''}
+        </div>`,
+        offset: new AMap.Pixel(0, -30)
+    });
+
+    marker.on('click', () => {
+        info.open(mapObj, marker.getPosition());
+        showPoiInfo(p);
+        // Check if nav is being set
+        if (document.getElementById('navCard').style.display !== 'none') {
+            if (!navStart) {
+                navStart = { ...p, _lng: lng, _lat: lat };
+                setSt('起点: ' + p.name, 'ok');
+            } else if (!navEnd) {
+                navEnd = { ...p, _lng: lng, _lat: lat };
+                drawNavPath3D(navStart, navEnd);
+                setSt('导航: ' + navStart.name + ' → ' + p.name, 'ok');
+            }
+        }
+    });
+
+    marker.setMap(mapObj);
+    geoMarkers.push(marker);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  STARTUP
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+    console.log('[STARTUP] window.load fired at', Date.now());
+    setTimeout(() => {
+        console.log('[STARTUP] calling initMap() at', Date.now());
+        initMap();
+    }, 200);
+});
+
+// ══════════════════════════════════════════════════════════════
+//  BUILDING MODELING EDITOR
+// ══════════════════════════════════════════════════════════════
+let edOpen = false;
+let edTool = 'select';
+let edFloor = null;  // currently editing floor name
+let edFloors = [];   // [{name, walls:[], zones:[], pois:[]}]
+let edSelected = null; // {type, idx}
+
+// Drawing state
+let edCanvas, edCtx;
+let edPts = [];       // current polygon points in canvas pixels
+let edDragPt = null; // {type:'poi'|'pt', idx, origX, origY}
+let edDragging = false;
+let edLastPt = null;  // for wall-out preview
+
+// Project metadata
+let edProject = { name:'未命名商场', lng:116.4608, lat:39.9097 };
+
+// ── Toggle ──
+function toggleEditor() {
+    edOpen = !edOpen;
+    document.getElementById('edPanel').classList.toggle('open', edOpen);
+    document.getElementById('edToggleBtn').classList.toggle('active', edOpen);
+    document.body.classList.toggle('editor-open', edOpen);
+
+    const canvas = document.getElementById('edCanvas');
+    if (edOpen) {
+        initEdCanvas();
+        if (edFloors.length === 0) edInitFloors();
+        edSwitchFloor(edFloor || edFloors[0]?.name);
+        edRefreshAll();
+        edSetTool('select');
+        if (!localStorage.getItem('edTutSeen')) {
+            setTimeout(() => showTutorial(0), 450);
+        }
+    } else {
+        canvas.classList.remove('draw-active');
+    }
+}
+
+// ── Canvas setup ──
+function initEdCanvas() {
+    edCanvas = document.getElementById('edCanvas');
+    edCtx = edCanvas.getContext('2d');
+    resizeEdCanvas();
+    window.removeEventListener('resize', resizeEdCanvas);
+    window.addEventListener('resize', resizeEdCanvas);
+    edCanvas.addEventListener('mousedown', edOnMouseDown);
+    edCanvas.addEventListener('mousemove', edOnMouseMove);
+    edCanvas.addEventListener('mouseup', edOnMouseUp);
+    edCanvas.addEventListener('dblclick', edOnDblClick);
+    edCanvas.addEventListener('contextmenu', e => { e.preventDefault(); edOnRightClick(e); });
+}
+
+function resizeEdCanvas() {
+    const mapEl = document.getElementById('map');
+    edCanvas.width = mapEl.offsetWidth;
+    edCanvas.height = mapEl.offsetHeight;
+    edRender();
+}
+
+// ── Floor management ──
+function edInitFloors() {
+    edFloors = [
+        {name:'B1', walls:[], zones:[], pois:[]},
+        {name:'L1', walls:[], zones:[], pois:[]},
+        {name:'L2', walls:[], zones:[], pois:[]},
+        {name:'L3', walls:[], zones:[], pois:[]},
+    ];
+    edFloor = edFloors[0].name;
+}
+
+function edSwitchFloor(name) {
+    edFloor = name;
+    edPts = [];
+    edSelected = null;
+    edHideProps();
+    edLastPt = null;
+    // Sync select
+    const sel = document.getElementById('edFloorSel');
+    if (sel) {
+        sel.value = name;
+        sel.querySelectorAll('option').forEach(o => { o.selected = o.value === name; });
+    }
+    edRefreshAll();
+    edRender();
+}
+
+function edAddFloor() {
+    const name = document.getElementById('newFloorName')?.value?.trim();
+    if (!name) return;
+    if (edFloors.find(f => f.name === name)) { alert('楼层已存在'); return; }
+    edFloors.push({name, walls:[], zones:[], pois:[]});
+    edRefreshFloorList();
+    edSwitchFloor(name);
+}
+
+function edRefreshFloorList() {
+    const sel = document.getElementById('edFloorSel');
+    if (sel) {
+        sel.innerHTML = edFloors.map(f => `<option value="${f.name}">${f.name}</option>`).join('');
+        sel.value = edFloor || edFloors[0]?.name;
+    }
+    const list = document.getElementById('edFlList');
+    if (list) {
+        list.innerHTML = edFloors.map(f => {
+            const n = f.pois.length + f.walls.length + f.zones.length;
+            const isActive = f.name === edFloor;
+            return `<div class="ed-fl-item ${isActive?'active':''}" onclick="edSwitchFloor('${f.name}')">
+                <div class="ed-fl-color" style="background:#1e3a5f"></div>
+                <span class="ed-fl-name">${f.name}</span>
+                <span class="ed-fl-n">${n} 个元素</span>
+                <button class="ed-item-del" style="opacity:1" onclick="event.stopPropagation();edDelFloor('${f.name}')">✕</button>
+            </div>`;
+        }).join('');
+    }
+}
+
+function edDelFloor(name) {
+    if (edFloors.length <= 1) { alert('至少保留一个楼层'); return; }
+    edFloors = edFloors.filter(f => f.name !== name);
+    edRefreshFloorList();
+    edSwitchFloor(edFloors[0].name);
+}
+
+// ── Tool ──
+function edSetTool(tool) {
+    edTool = tool;
+    edPts = [];
+    edSelected = null;
+    edHideProps();
+    document.querySelectorAll('.ed-tool').forEach(b => b.classList.remove('active','seg-active'));
+    const btn = document.getElementById('tool-' + tool);
+    if (btn) btn.classList.add('active');
+    edCanvas?.classList.toggle('draw-active', tool !== 'select');
+    edUpdateStatus();
+}
+
+function edUpdateStatus() {
+    const bar = document.getElementById('edStatusBar');
+    if (!bar) return;
+    const floor = edGetFloor();
+    let cls = 'warn', html = '';
+    switch (edTool) {
+        case 'select':
+            cls = '';
+            html = `🖱️ <b>选择工具</b>：点击元素选中并拖动移动；选中后可改颜色 / 删除。<span class="next">💡 右键点击元素删除 · <span class="kbd">Del</span> 删除选中 · <span class="kbd">Ctrl+Z</span> 撤销</span>`;
+            break;
+        case 'poi':
+            html = `📍 <b>标注工具</b>：在画布点击放置 POI（已 ${floor?.pois?.length||0} 个）。可在右侧「标注点」设置名称与类型。<span class="next">👉 完成后切到「选择」工具可移动 / 删除。</span>`;
+            break;
+        case 'wall-out':
+            if (edPts.length === 0)
+                html = `🏗️ <b>外墙轮廓</b>：点击放置<b>第一个顶点</b>。<span class="next">👉 依次点击添加顶点，<b>双击</b>或点击起点封闭成建筑外形 · <span class="kbd">Esc</span> 取消</span>`;
+            else
+                html = `🏗️ 外墙绘制中：已 <b>${edPts.length}</b> 个顶点。<span class="next">👉 继续点击加点 · <b>双击</b>封闭完成（至少 3 点）· 右键撤一点 · <span class="kbd">Esc</span> 取消</span>`;
+            break;
+        case 'wall-in':
+            if (edPts.length === 0)
+                html = `🔲 <b>隔墙</b>：点击<b>起点</b>，再点<b>终点</b>画一段墙。<span class="next">👉 可连续画多段 · <b>双击</b>结束本段 · <span class="kbd">Esc</span> 取消</span>`;
+            else
+                html = `🔲 隔墙绘制中：已 <b>${edPts.length}</b> 点。<span class="next">👉 双击结束当前段（可继续画下一段）· 右键撤一点 · <span class="kbd">Esc</span> 取消</span>`;
+            break;
+        case 'rect':
+            if (edPts.length === 0)
+                html = `⬜ <b>矩形区域</b>：点击确定<b>一角</b>，拖动到对角松开。<span class="next">👉 在右侧「区域」设置颜色 / 透明度 / 标签</span>`;
+            else
+                html = `⬜ 矩形绘制中…松开鼠标完成。`;
+            break;
+        case 'poly':
+            if (edPts.length === 0)
+                html = `🔷 <b>多边形区域</b>：点击添加顶点。<span class="next">👉 依次点击 · <b>双击</b>封闭 · <span class="kbd">Esc</span> 取消</span>`;
+            else
+                html = `🔷 多边形(${edPts.length}点)：点击添加 · <b>双击</b>封闭 · 右键撤一点 · <span class="kbd">Esc</span> 取消`;
+            break;
+    }
+    bar.innerHTML = `<div class="ed-status ${cls}">${html}</div>`;
+}
+
+function edGetFloor() {
+    return edFloors.find(f => f.name === edFloor);
+}
+
+// ── Canvas → Map coordinate conversion ──
+function canvasToLngLat(cx, cy) {
+    // We use a fixed scale: canvas = map at zoom 18 centered on building
+    // Simulate AMap pixel to lng/lat conversion
+    const zoom = 18;
+    const center = mapObj?.getCenter();
+    const lng = center ? center.getLng() : edProject.lng;
+    const lat = center ? center.getLat() : edProject.lat;
+    const cn = mapObj?.getContainer();
+    const cw = cn?.offsetWidth || window.innerWidth - 280;
+    const ch = cn?.offsetHeight || window.innerHeight - 52;
+    const scale = Math.pow(2, zoom - 10);
+    const lngPerPx = 360 / (256 * scale);
+    const latPerPx = 360 / (256 * scale);
+    return {
+        lng: lng + (cx - cw/2) * lngPerPx,
+        lat: lat - (cy - ch/2) * latPerPx
+    };
+}
+
+function lngLatToCanvas(lng, lat) {
+    const zoom = 18;
+    const center = mapObj?.getCenter();
+    const clng = center ? center.getLng() : edProject.lng;
+    const clat = center ? center.getLat() : edProject.lat;
+    const cn = mapObj?.getContainer();
+    const cw = cn?.offsetWidth || window.innerWidth - 280;
+    const ch = cn?.offsetHeight || window.innerHeight - 52;
+    const scale = Math.pow(2, zoom - 10);
+    const lngPerPx = 360 / (256 * scale);
+    const latPerPx = 360 / (256 * scale);
+    return {
+        x: (lng - clng) / lngPerPx + cw/2,
+        y: (clat - lat) / latPerPx + ch/2
+    };
+}
+
+// ── Mouse events ──
+function edOnMouseDown(e) {
+    const rect = edCanvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    edLastPt = {x: cx, y: cy};
+
+    if (edTool === 'select') {
+        // Hit test
+        const hit = edHitTest(cx, cy);
+        edSelected = hit;
+        if (hit) {
+            edDragging = true;
+            edDragPt = { x: cx, y: cy };
+            edShowProps();
+        } else {
+            edHideProps();
+        }
+        edRender();
+        return;
+    }
+
+    if (edTool === 'poi') {
+        const ll = canvasToLngLat(cx, cy);
+        const floor = edGetFloor();
+        if (!floor) return;
+        const name = document.getElementById('poiNameInput')?.value?.trim() || `POI ${floor.pois.length + 1}`;
+        const cat = document.querySelector('.cat-pill.active')?.dataset?.cat || 'service';
+        floor.pois.push({name, lng: ll.lng, lat: ll.lat, category: cat, color: FCOLS[cat]||'#10b981'});
+        edRefreshPOIList();
+        edRefreshAll();
+        edRender();
+        edQSMarkDone(3);
+        return;
+    }
+
+    if (edTool === 'wall-out' || edTool === 'wall-in' || edTool === 'poly') {
+        edPts.push({x: cx, y: cy});
+        edUpdateStatus();
+        edRender();
+        return;
+    }
+
+    if (edTool === 'rect') {
+        edPts = [{x: cx, y: cy}];
+        edUpdateStatus();
+        return;
+    }
+}
+
+function edOnMouseMove(e) {
+    if (!edLastPt) return;
+    const rect = edCanvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+
+    if (edDragging && edSelected) {
+        const dx = cx - edDragPt.x;
+        const dy = cy - edDragPt.y;
+        edDragPt = {x: cx, y: cy};
+        edMoveSelected(dx, dy);
+        edRender();
+        return;
+    }
+
+    if (edTool === 'rect' && edPts.length === 1) {
+        edLastPt = {x: cx, y: cy};
+        edRender();
+        // Draw preview rect
+        edCtx.save();
+        edCtx.strokeStyle = '#00d4ff';
+        edCtx.lineWidth = 2;
+        edCtx.setLineDash([5,3]);
+        const p = edPts[0];
+        edCtx.strokeRect(p.x, p.y, cx - p.x, cy - p.y);
+        edCtx.restore();
+        return;
+    }
+
+    edLastPt = {x: cx, y: cy};
+    if (edPts.length > 0) edRender();
+}
+
+function edOnMouseUp(e) {
+    edDragging = false;
+    if (edTool === 'rect' && edPts.length === 1) {
+        const rect = edCanvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const p1 = edPts[0];
+        const floor = edGetFloor();
+        if (!floor) return;
+        const ll1 = canvasToLngLat(p1.x, p1.y);
+        const ll2 = canvasToLngLat(cx, cy);
+        floor.zones.push({
+            type:'rect',
+            label: document.getElementById('zoneLabel')?.value?.trim() || '',
+            color: document.getElementById('zoneColor')?.value || '#1e3a5f',
+            alpha: parseFloat(document.getElementById('zoneAlpha')?.value) || 0.4,
+            bounds: {minLng:Math.min(ll1.lng,ll2.lng), maxLng:Math.max(ll1.lng,ll2.lng),
+                     minLat:Math.min(ll1.lat,ll2.lat), maxLat:Math.max(ll1.lat,ll2.lat)}
+        });
+        edPts = [];
+        edRefreshZonesList();
+        edRefreshAll();
+        edRender();
+        edUpdateStatus();
+        edQSMarkDone(2);
+    }
+}
+
+function edOnDblClick(e) {
+    if (edTool === 'wall-out' || edTool === 'wall-in' || edTool === 'poly') {
+        if (edPts.length < 2) return;
+        const floor = edGetFloor();
+        if (!floor) return;
+        const walls = edPts.map(p => canvasToLngLat(p.x, p.y));
+        floor.walls.push({
+            type: edTool === 'wall-out' ? 'polygon' : (edTool === 'wall-in' ? 'polyline' : 'polygon'),
+            closed: edTool !== 'wall-in',
+            pts: walls,
+            color: edTool === 'wall-out' ? '#00d4ff' : '#a855f7'
+        });
+        edPts = [];
+        edRefreshWallsList();
+        edRefreshAll();
+        edRender();
+        edUpdateStatus();
+        if (edTool === 'wall-out') edQSMarkDone(0);
+        else if (edTool === 'wall-in') edQSMarkDone(1);
+        else if (edTool === 'poly') edQSMarkDone(2);
+    }
+}
+
+function edOnRightClick(e) {
+    if (edPts.length > 0) { edPts.pop(); edRender(); edUpdateStatus(); }
+}
+
+// ── Hit test ──
+function edHitTest(cx, cy) {
+    const floor = edGetFloor();
+    if (!floor) return null;
+    // Test POIs
+    for (let i = 0; i < floor.pois.length; i++) {
+        const p = floor.pois[i];
+        const c = lngLatToCanvas(p.lng, p.lat);
+        if (Math.hypot(cx - c.x, cy - c.y) < 12) return {type:'poi', idx:i};
+    }
+    // Test walls (polygon fill)
+    for (let i = 0; i < floor.walls.length; i++) {
+        const w = floor.walls[i];
+        if (w.type === 'polygon' && edPointInPoly(cx, cy, w.pts.map(p => lngLatToCanvas(p.lng, p.lat)))) {
+            return {type:'wall', idx:i};
+        }
+    }
+    // Test zones
+    for (let i = 0; i < floor.zones.length; i++) {
+        const z = floor.zones[i];
+        const c1 = lngLatToCanvas(z.bounds.minLng, z.bounds.minLat);
+        const c2 = lngLatToCanvas(z.bounds.maxLng, z.bounds.maxLat);
+        if (cx >= c1.x && cx <= c2.x && cy >= c1.y && cy <= c2.y) return {type:'zone', idx:i};
+    }
+    return null;
+}
+
+function edPointInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length-1; i < poly.length; j = i++) {
+        const xi = poly[i].x, yi = poly[i].y;
+        const xj = poly[j].x, yj = poly[j].y;
+        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+}
+
+function edMoveSelected(dx, dy) {
+    const floor = edGetFloor();
+    if (!floor || !edSelected) return;
+    const {type, idx} = edSelected;
+    if (type === 'poi') {
+        const p = floor.pois[idx];
+        const ll = canvasToLngLat(lngLatToCanvas(p.lng, p.lat).x + dx, lngLatToCanvas(p.lng, p.lat).y + dy);
+        p.lng = ll.lng; p.lat = ll.lat;
+    } else if (type === 'wall') {
+        floor.walls[idx].pts = floor.walls[idx].pts.map(p => {
+            const c = lngLatToCanvas(p.lng, p.lat);
+            return canvasToLngLat(c.x + dx, c.y + dy);
+        });
+    } else if (type === 'zone') {
+        const z = floor.zones[idx];
+        const p1 = canvasToLngLat(lngLatToCanvas(z.bounds.minLng, z.bounds.minLat).x + dx, lngLatToCanvas(z.bounds.minLng, z.bounds.minLat).y + dy);
+        const p2 = canvasToLngLat(lngLatToCanvas(z.bounds.maxLng, z.bounds.maxLat).x + dx, lngLatToCanvas(z.bounds.maxLng, z.bounds.maxLat).y + dy);
+        z.bounds = {minLng:Math.min(p1.lng,p2.lng), maxLng:Math.max(p1.lng,p2.lng), minLat:Math.min(p1.lat,p2.lat), maxLat:Math.max(p1.lat,p2.lat)};
+    }
+    edRefreshAll();
+}
+
+// ── Render ──
+function edRender() {
+    if (!edCtx) return;
+    edCtx.clearRect(0, 0, edCanvas.width, edCanvas.height);
+
+    // Grid background for spatial reference
+    const gsize = 40;
+    edCtx.save();
+    edCtx.strokeStyle = 'rgba(255,255,255,0.045)';
+    edCtx.lineWidth = 1;
+    for (let x = 0; x <= edCanvas.width; x += gsize) {
+        edCtx.beginPath(); edCtx.moveTo(x, 0); edCtx.lineTo(x, edCanvas.height); edCtx.stroke();
+    }
+    for (let y = 0; y <= edCanvas.height; y += gsize) {
+        edCtx.beginPath(); edCtx.moveTo(0, y); edCtx.lineTo(edCanvas.width, y); edCtx.stroke();
+    }
+    edCtx.strokeStyle = 'rgba(0,212,255,0.16)';
+    edCtx.beginPath(); edCtx.moveTo(edCanvas.width/2, 0); edCtx.lineTo(edCanvas.width/2, edCanvas.height); edCtx.stroke();
+    edCtx.beginPath(); edCtx.moveTo(0, edCanvas.height/2); edCtx.lineTo(edCanvas.width, edCanvas.height/2); edCtx.stroke();
+    edCtx.restore();
+
+    const floor = edGetFloor();
+    if (!floor) return;
+
+    // Draw zones
+    floor.zones.forEach((z, i) => {
+        const isSel = edSelected?.type === 'zone' && edSelected?.idx === i;
+        const c1 = lngLatToCanvas(z.bounds.minLng, z.bounds.minLat);
+        const c2 = lngLatToCanvas(z.bounds.maxLng, z.bounds.maxLat);
+        edCtx.fillStyle = z.color + Math.round((z.alpha||0.4)*255).toString(16).padStart(2,'0');
+        edCtx.fillRect(c1.x, c1.y, c2.x-c1.x, c2.y-c1.y);
+        edCtx.strokeStyle = isSel ? '#fff' : z.color;
+        edCtx.lineWidth = isSel ? 2 : 1;
+        edCtx.strokeRect(c1.x, c1.y, c2.x-c1.x, c2.y-c1.y);
+        if (z.label) {
+            edCtx.fillStyle = '#fff';
+            edCtx.font = '11px sans-serif';
+            edCtx.fillText(z.label, c1.x+4, c1.y+14);
+        }
+    });
+
+    // Draw walls
+    floor.walls.forEach((w, i) => {
+        const isSel = edSelected?.type === 'wall' && edSelected?.idx === i;
+        const pts = w.pts.map(p => lngLatToCanvas(p.lng, p.lat));
+        if (pts.length < 2) return;
+        edCtx.beginPath();
+        edCtx.moveTo(pts[0].x, pts[0].y);
+        for (let k = 1; k < pts.length; k++) edCtx.lineTo(pts[k].x, pts[k].y);
+        if (w.closed) edCtx.closePath();
+        if (w.type === 'polygon') {
+            edCtx.fillStyle = (w.color||'#00d4ff') + '22';
+            edCtx.fill();
+        }
+        edCtx.strokeStyle = isSel ? '#fff' : (w.color||'#00d4ff');
+        edCtx.lineWidth = w.closed ? (isSel?3:2) : (isSel?3:1.5);
+        edCtx.setLineDash(w.closed?[]:[6,3]);
+        edCtx.stroke();
+        edCtx.setLineDash([]);
+        // Vertices
+        pts.forEach((p, ki) => {
+            edCtx.beginPath();
+            edCtx.arc(p.x, p.y, isSel?5:3, 0, Math.PI*2);
+            edCtx.fillStyle = isSel?'#fff':w.color||'#00d4ff';
+            edCtx.fill();
+        });
+    });
+
+    // Draw POIs
+    floor.pois.forEach((p, i) => {
+        const c = lngLatToCanvas(p.lng, p.lat);
+        const isSel = edSelected?.type === 'poi' && edSelected?.idx === i;
+        const r = isSel ? 8 : 6;
+        edCtx.beginPath();
+        edCtx.arc(c.x, c.y, r, 0, Math.PI*2);
+        edCtx.fillStyle = p.color || '#10b981';
+        edCtx.fill();
+        if (isSel) {
+            edCtx.strokeStyle = '#fff';
+            edCtx.lineWidth = 2;
+            edCtx.stroke();
+        }
+        edCtx.fillStyle = '#fff';
+        edCtx.font = `${isSel?'bold ':''}10px sans-serif`;
+        edCtx.textAlign = 'center';
+        edCtx.fillText(p.name.substring(0,8), c.x, c.y - r - 3);
+        edCtx.textAlign = 'start';
+    });
+
+    // Draw current polygon in progress
+    if (edPts.length > 0) {
+        edCtx.beginPath();
+        edCtx.moveTo(edPts[0].x, edPts[0].y);
+        for (let k = 1; k < edPts.length; k++) edCtx.lineTo(edPts[k].x, edPts[k].y);
+        if (edLastPt) edCtx.lineTo(edLastPt.x, edLastPt.y);
+        edCtx.strokeStyle = '#00d4ff';
+        edCtx.lineWidth = 2;
+        edCtx.setLineDash([5,3]);
+        edCtx.stroke();
+        edCtx.setLineDash([]);
+        // Points
+        edPts.forEach((p, i) => {
+            edCtx.beginPath();
+            edCtx.arc(p.x, p.y, i===0?6:4, 0, Math.PI*2);
+            edCtx.fillStyle = i===0?'#00d4ff':'#fff';
+            edCtx.fill();
+            edCtx.strokeStyle = '#00d4ff';
+            edCtx.lineWidth = 1;
+            edCtx.stroke();
+        });
+    }
+}
+
+// ── Lists ──
+function edRefreshWallsList() {
+    const floor = edGetFloor();
+    const list = document.getElementById('edWallsList');
+    if (!list) return;
+    if (!floor?.walls.length) { list.innerHTML = '<div style="font-size:11px;color:#4b5563;text-align:center;padding:12px">暂无外墙/隔墙，点击工具绘制</div>'; return; }
+    list.innerHTML = floor.walls.map((w,i) => `
+        <div class="ed-item ${edSelected?.type==='wall'&&edSelected?.idx===i?'selected':''}" onclick="edSelectItem('wall',${i})">
+            <div class="ed-item-dot" style="background:${w.color||'#00d4ff'}"></div>
+            <span class="ed-item-name">${w.type==='polygon'?'外墙':'隔墙'} · ${w.pts.length}点</span>
+            <button class="ed-item-del" onclick="event.stopPropagation();edDelItem('wall',${i})">✕</button>
+        </div>`).join('');
+}
+
+function edRefreshZonesList() {
+    const floor = edGetFloor();
+    const list = document.getElementById('edZonesList');
+    if (!list) return;
+    if (!floor?.zones.length) { list.innerHTML = '<div style="font-size:11px;color:#4b5563;text-align:center;padding:12px">暂无区域，使用矩形工具绘制</div>'; return; }
+    list.innerHTML = floor.zones.map((z,i) => `
+        <div class="ed-item ${edSelected?.type==='zone'&&edSelected?.idx===i?'selected':''}" onclick="edSelectItem('zone',${i})">
+            <div class="ed-item-dot" style="background:${z.color}"></div>
+            <span class="ed-item-name">${z.label||'区域'} · ${z.type}</span>
+            <button class="ed-item-del" onclick="event.stopPropagation();edDelItem('zone',${i})">✕</button>
+        </div>`).join('');
+}
+
+function edRefreshPOIList() {
+    const floor = edGetFloor();
+    const list = document.getElementById('edPoisList');
+    if (!list) return;
+    if (!floor?.pois.length) { list.innerHTML = '<div style="font-size:11px;color:#4b5563;text-align:center;padding:12px">暂无标注点，使用标注工具放置</div>'; return; }
+    list.innerHTML = floor.pois.map((p,i) => `
+        <div class="ed-item ${edSelected?.type==='poi'&&edSelected?.idx===i?'selected':''}" onclick="edSelectItem('poi',${i})">
+            <div class="ed-item-dot" style="background:${p.color}"></div>
+            <span class="ed-item-name">${p.name}</span>
+            <span class="ed-item-meta">${p.category||''}</span>
+            <button class="ed-item-del" onclick="event.stopPropagation();edDelItem('poi',${i})">✕</button>
+        </div>`).join('');
+}
+
+function edSelectItem(type, idx) {
+    edSelected = {type, idx};
+    // Pan to item
+    const floor = edGetFloor();
+    if (!floor) return;
+    if (type === 'poi') {
+        const p = floor.pois[idx];
+        if (p && mapObj) mapObj.panTo([p.lng, p.lat]);
+    }
+    edRefreshAll();
+    edRender();
+    edShowProps();
+}
+
+function edDelItem(type, idx) {
+    const floor = edGetFloor();
+    if (!floor) return;
+    if (type === 'wall') floor.walls.splice(idx, 1);
+    else if (type === 'zone') floor.zones.splice(idx, 1);
+    else if (type === 'poi') floor.pois.splice(idx, 1);
+    edSelected = null;
+    edRefreshAll();
+    edRender();
+}
+
+// ── Selected element properties popover ──
+function edShowProps() {
+    const el = document.getElementById('edProps');
+    const floor = edGetFloor();
+    if (!el || !floor || !edSelected) { edHideProps(); return; }
+    const {type, idx} = edSelected;
+    let obj, title, color, name = '', showAlpha = false, alpha = 1;
+    if (type === 'poi') { obj = floor.pois[idx]; title = '标注点'; color = obj.color || '#10b981'; name = obj.name || ''; }
+    else if (type === 'wall') { obj = floor.walls[idx]; title = obj.type === 'polygon' ? '外墙轮廓' : '隔墙'; color = obj.color || '#00d4ff'; }
+    else if (type === 'zone') { obj = floor.zones[idx]; title = '区域 ' + (obj.type || ''); color = obj.color || '#1e3a5f'; name = obj.label || ''; showAlpha = true; alpha = obj.alpha || 0.4; }
+    else { edHideProps(); return; }
+    const titleEl = document.getElementById('edPropsTitle');
+    if (titleEl.firstChild) titleEl.firstChild.textContent = (type === 'poi' && name ? name + ' ' : '属性 ');
+    document.getElementById('edPropsType').textContent = title;
+    const nameEl = document.getElementById('edPropsName');
+    nameEl.value = name;
+    nameEl.disabled = (type === 'wall');
+    const colorEl = document.getElementById('edPropsColor');
+    if (color && color[0] === '#') colorEl.value = color;
+    document.getElementById('edPropsAlphaRow').style.display = showAlpha ? '' : 'none';
+    if (showAlpha) document.getElementById('edPropsAlpha').value = alpha;
+    // Position near element on canvas
+    const rb = edCanvas.getBoundingClientRect();
+    let sx = rb.left + edCanvas.width / 2, sy = rb.top + 130;
+    if (type === 'poi') { const c = lngLatToCanvas(obj.lng, obj.lat); sx = rb.left + c.x; sy = rb.top + c.y; }
+    else if (type === 'zone') { const c = lngLatToCanvas(obj.bounds.minLng, obj.bounds.minLat); sx = rb.left + c.x; sy = rb.top + c.y; }
+    el.style.left = Math.min(Math.max(sx + 18, 296), window.innerWidth - 236) + 'px';
+    el.style.top = Math.max(64, Math.min(sy + 18, window.innerHeight - 280)) + 'px';
+    el.classList.add('show');
+}
+function edHideProps() { document.getElementById('edProps')?.classList.remove('show'); }
+function edPropsNameI() {
+    const floor = edGetFloor(); if (!floor || !edSelected) return;
+    const v = document.getElementById('edPropsName').value;
+    if (edSelected.type === 'poi') floor.pois[edSelected.idx].name = v;
+    else if (edSelected.type === 'zone') floor.zones[edSelected.idx].label = v;
+    edRefreshAll(); edRender();
+}
+function edPropsColorI() {
+    const floor = edGetFloor(); if (!floor || !edSelected) return;
+    const v = document.getElementById('edPropsColor').value;
+    if (edSelected.type === 'poi') floor.pois[edSelected.idx].color = v;
+    else if (edSelected.type === 'wall') floor.walls[edSelected.idx].color = v;
+    else if (edSelected.type === 'zone') floor.zones[edSelected.idx].color = v;
+    edRefreshAll(); edRender();
+}
+function edPropsAlphaI() {
+    const floor = edGetFloor(); if (!floor || !edSelected) return;
+    const v = parseFloat(document.getElementById('edPropsAlpha').value);
+    if (edSelected.type === 'zone') floor.zones[edSelected.idx].alpha = v;
+    edRefreshAll(); edRender();
+}
+function edPropsDelete() {
+    if (!edSelected) return;
+    edDelItem(edSelected.type, edSelected.idx);
+    edHideProps();
+}
+
+function edClearFloor() {
+    if (!confirm('确定清空当前楼层所有绘制内容？')) return;
+    const floor = edGetFloor();
+    if (!floor) return;
+    floor.walls = []; floor.zones = []; floor.pois = [];
+    edSelected = null; edPts = [];
+    edRefreshAll(); edRender();
+}
+
+function edUndo() {
+    if (edPts.length > 0) { edPts.pop(); edRender(); edUpdateStatus(); return; }
+    // Undo last element
+    const floor = edGetFloor();
+    if (!floor) return;
+    if (floor.pois.length) { floor.pois.pop(); edRefreshAll(); edRender(); return; }
+    if (floor.walls.length) { floor.walls.pop(); edRefreshAll(); edRender(); return; }
+    if (floor.zones.length) { floor.zones.pop(); edRefreshAll(); edRender(); return; }
+}
+
+function edRefreshAll() {
+    edRefreshFloorList();
+    edRefreshWallsList();
+    edRefreshZonesList();
+    edRefreshPOIList();
+    edUpdateStatus();
+}
+
+// ── Tab switch ──
+function edSwitchTab(name) {
+    document.querySelectorAll('.ed-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.ed-tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + name)?.classList.add('active');
+    document.getElementById('ct-' + name)?.classList.add('active');
+}
+
+// ── Category pills ──
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.cat-pill').forEach(p => {
+        p.addEventListener('click', () => {
+            document.querySelectorAll('.cat-pill').forEach(x => x.classList.remove('active'));
+            p.classList.add('active');
+        });
+    });
+    // Zone alpha label
+    const zoneAlpha = document.getElementById('zoneAlpha');
+    if (zoneAlpha) {
+        zoneAlpha.addEventListener('input', () => {
+            const lbl = document.getElementById('zoneAlphaLbl');
+            if (lbl) lbl.textContent = Math.round(zoneAlpha.value * 100) + '%';
+        });
+    }
+});
+
+// ── Preview 3D ──
+function edPreview3D() {
+    // Switch to 3D view and render floor data
+    if (!scene3) { alert('请先确保 3D 场景已初始化'); return; }
+    edApplyToScene();
+    setMode('three');
+    setSt('✅ 3D 预览就绪！', 'ok');
+    document.getElementById('edReturnHint')?.classList.add('show');
+    edQSMarkDone(4);
+}
+
+// ── Return from 3D preview to editor ──
+function edReturnToEditor() {
+    document.getElementById('edReturnHint')?.classList.remove('show');
+    setMode('amap');
+    const panel = document.getElementById('edPanel');
+    if (panel && !panel.classList.contains('open')) {
+        edOpen = true;
+        panel.classList.add('open');
+        document.getElementById('edToggleBtn')?.classList.add('active');
+        document.body.classList.add('editor-open');
+        edSetTool('select');
+        edRefreshAll(); edRender();
+    }
+}
+
+// ── Apply editor data to 3D scene ──
+function edApplyToScene() {
+    if (!scene3) return;
+    // Remove previous editor meshes
+    if (window._edMeshes) {
+        window._edMeshes.forEach(m => scene3.remove(m));
+    }
+    window._edMeshes = [];
+
+    edFloors.forEach((floor, fi) => {
+        const yBase = fi * (bld?.floorH || 3.5);
+        const floorY = -(edFloors.length * (bld?.floorH||3.5) / 2) + yBase;
+
+        // Draw walls
+        floor.walls.forEach(w => {
+            const pts = w.pts.map(p => {
+                const wp = llToWorld(p.lng, p.lat);
+                return new THREE.Vector3(wp.x, 0, wp.z);
+            });
+            if (w.type === 'polygon' && pts.length >= 3) {
+                const shape = new THREE.Shape();
+                shape.moveTo(pts[0].x, pts[0].z);
+                for (let k = 1; k < pts.length; k++) shape.lineTo(pts[k].x, pts[k].z);
+                shape.closePath();
+                const geo = new THREE.ShapeGeometry(shape);
+                const mat = new THREE.MeshPhongMaterial({ color: w.color||'#00d4ff', transparent:true, opacity:0.25, side:THREE.DoubleSide });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.rotation.x = -Math.PI/2;
+                mesh.position.y = floorY;
+                mesh.userData.floor = floor.name;
+                scene3.add(mesh);
+                window._edMeshes.push(mesh);
+                // Wall lines
+                const linePts = [...pts, pts[0]].map(p => new THREE.Vector3(p.x, floorY + 3, p.z));
+                const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+                const lineMat = new THREE.LineBasicMaterial({ color: w.color||'#00d4ff', linewidth:2 });
+                scene3.add(new THREE.Line(lineGeo, lineMat));
+                window._edMeshes.push(new THREE.Line(lineGeo, lineMat));
+            } else if (pts.length >= 2) {
+                // Polyline wall
+                const linePts = pts.map(p => new THREE.Vector3(p.x, floorY, p.z));
+                const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+                const lineMat = new THREE.LineBasicMaterial({ color: w.color||'#a855f7', linewidth:1 });
+                scene3.add(new THREE.Line(lineGeo, lineMat));
+                window._edMeshes.push(new THREE.Line(lineGeo, lineMat));
+            }
+        });
+
+        // Draw zones
+        floor.zones.forEach(z => {
+            const c1 = llToWorld(z.bounds.minLng, z.bounds.minLat);
+            const c2 = llToWorld(z.bounds.maxLng, z.bounds.maxLat);
+            const geo = new THREE.PlaneGeometry(Math.abs(c2.x-c1.x), Math.abs(c2.z-c1.z));
+            const col = z.color.replace('#','');
+            const r = parseInt(col.substring(0,2),16), gv = parseInt(col.substring(2,4),16), b = parseInt(col.substring(4,6),16);
+            const mat = new THREE.MeshPhongMaterial({ color: new THREE.Color(r/255,gv/255,b/255), transparent:true, opacity: z.alpha||0.4, side:THREE.DoubleSide });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.x = -Math.PI/2;
+            mesh.position.set((c1.x+c2.x)/2, floorY + 0.05, (c1.z+c2.z)/2);
+            mesh.userData.floor = floor.name;
+            scene3.add(mesh);
+            window._edMeshes.push(mesh);
+        });
+
+        // Draw POIs
+        floor.pois.forEach(p => {
+            const wp = llToWorld(p.lng, p.lat);
+            const geo = new THREE.CylinderGeometry(2, 2, 1.5, 12);
+            const col = p.color?.replace('#','') || '10b981';
+            const r = parseInt(col.substring(0,2),16), gv = parseInt(col.substring(2,4),16), b = parseInt(col.substring(4,6),16);
+            const mat = new THREE.MeshPhongMaterial({ color: new THREE.Color(r/255,gv/255,b/255) });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(wp.x, floorY + 0.75, wp.z);
+            mesh.userData.floor = floor.name;
+            scene3.add(mesh);
+            window._edMeshes.push(mesh);
+        });
+    });
+}
+
+// ── Save / Load ──
+function edSaveProject() {
+    const name = prompt('项目名称：', edProject.name || '我的商场');
+    if (!name) return;
+    edProject.name = name;
+    if (mapObj) {
+        const c = mapObj.getCenter();
+        edProject.lng = c.getLng();
+        edProject.lat = c.getLat();
+    }
+    const data = JSON.stringify({project: edProject, floors: edFloors}, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (name + '_indoor.json').replace(/\s/g,'_');
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setSt('💾 项目已保存', 'ok');
+}
+
+function edLoadProject() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.geojson';
+    input.onchange = () => {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.project) edProject = {...edProject, ...data.project};
+                if (data.floors && data.floors.length) {
+                    edFloors = data.floors;
+                    edFloor = edFloors[0].name;
+                }
+                edRefreshAll();
+                edRender();
+                setSt('📂 项目已加载', 'ok');
+            } catch(err) {
+                alert('加载失败：' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', e => {
+    if (!edOpen) return;
+    if (e.key === 'Escape') { edPts = []; edSelected = null; edRender(); edUpdateStatus(); }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (edSelected && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
+            edDelItem(edSelected.type, edSelected.idx);
+        }
+    }
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey)) edUndo();
+});
+
+// ══════════════════════════════════════════════════════════════
+//  VIEW MODES
+// ══════════════════════════════════════════════════════════════
+function setMode(mode) {
+    const canvas = document.getElementById('threeCanvas');
+    const pill = document.getElementById('modePill');
+    if (mode === 'three') {
+        canvas.style.opacity = '1';
+        canvas.classList.add('active');
+        viewMode = 'three';
+        if (pill) pill.textContent = '3D 建筑';
+        if (mapObj) mapObj.setStatus({isHotspot:false});
+        document.getElementById('navInfo')?.style && (document.getElementById('navInfo').style.display = 'none');
+        if (renderer3) renderer3.setClearColor(0x000000, 0);
+        // Close editor when entering 3D preview
+        if (edOpen) {
+            document.getElementById('edPanel').classList.remove('open');
+            document.getElementById('edToggleBtn')?.classList.remove('active');
+            document.body.classList.remove('editor-open');
+        }
+    } else if (mode === 'amap') {
+        canvas.style.opacity = '0';
+        canvas.classList.remove('active');
+        viewMode = 'amap';
+        if (pill) pill.textContent = 'AMap 地图';
+        if (mapObj) mapObj.setStatus({isHotspot:true});
+        document.getElementById('navInfo')?.style && (document.getElementById('navInfo').style.display = '');
+    }
+}
+
+// ── Map view mode click on header ──
+document.addEventListener('DOMContentLoaded', () => {
+    const pill = document.getElementById('modePill');
+    if (pill) {
+        pill.style.cursor = 'pointer';
+        pill.addEventListener('click', () => {
+            if (viewMode === 'amap') setMode('three');
+            else setMode('amap');
+        });
+    }
+});
+
+// ── Outdoor vs indoor switch ──
+document.addEventListener('DOMContentLoaded', () => {
+    // Also make the header mode switcher work
+    const hdrBtns = document.querySelectorAll('.hdr-btn.mode-btn');
+    hdrBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            hdrBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const mode = btn.dataset.mode;
+            if (mode === 'three') setMode('three');
+            else setMode('amap');
+        });
+    });
+});
+
+// ── Quick start guide interactions ──
+function edToggleQS() {
+    const qs = document.getElementById('edQuickStart');
+    if (!qs) return;
+    qs.classList.toggle('collapsed');
+    const t = document.getElementById('edQSToggle');
+    if (t) t.textContent = qs.classList.contains('collapsed') ? '展开 ▼' : '收起 ▲';
+}
+function edQSGo(step) {
+    const map = [
+        () => { edSwitchTab('walls'); edSetTool('wall-out'); },
+        () => { edSwitchTab('walls'); edSetTool('wall-in'); },
+        () => { edSwitchTab('zones'); edSetTool('rect'); },
+        () => { edSwitchTab('pois'); edSetTool('poi'); },
+        () => { edPreview3D(); }
+    ];
+    if (map[step]) map[step]();
+    const qs = document.getElementById('edQuickStart');
+    if (qs && qs.classList.contains('collapsed')) edToggleQS();
+}
+function edQSMarkDone(step) {
+    const el = document.getElementById('qs-step-' + step);
+    if (el) el.classList.add('done');
+}
+
+// ── Tutorial system ──
+const tutorialSteps = [
+    { title: '欢迎使用建筑建模编辑器', body: '本教程用 9 步带你完成一个商场的 3D 建模。随时可点右上角 <code>📖 教程</code> 重新查看。', tip: '建议同时打开右侧「🚀 快速开始」清单，边看边做。' },
+    { title: '① 打开建模编辑器', body: '点击顶部 <code>✏️ 建筑建模</code> 打开右侧面板与画布。画布即当前楼层的俯视图，带网格与中心十字便于定位。', tip: '画布上的网格每格代表约一个商铺的开间，中心十字是建筑中心。' },
+    { title: '② 画建筑外墙（轮廓）', body: '选 <code>外墙</code> 工具，在画布上依次<b>点击</b>放置顶点，连成闭合多边形；<b>双击</b>或点回起点封闭，即形成建筑外形。', tip: '至少 3 个顶点。绘制中右键可撤掉上一个点，<code>Esc</code> 取消重画。' },
+    { title: '③ 画隔墙划分空间', body: '选 <code>隔墙</code> 工具，点<b>起点</b>再点<b>终点</b>画一段；可连续画多段，<b>双击</b>结束当前段。', tip: '外墙=建筑外壳(闭合填充)，隔墙=室内分隔(虚线段)，颜色不同便于区分。' },
+    { title: '④ 画区域（店铺 / 中庭）', body: '选 <code>矩形</code> 或 <code>多边形</code> 工具在楼层内圈出区域。矩形：点一角拖到对角松开；多边形：点击加顶点、双击封闭。', tip: '右侧「区域」页可设置颜色、透明度与标签（如「中庭」「美食区」）。' },
+    { title: '⑤ 放置标注点 POI', body: '选 <code>标注</code> 工具，在画布点击放置 POI。右侧「标注点」页可设名称与类型，或先选类型再放置。', tip: 'POI 代表电梯、扶梯、店铺入口等关键位置，3D 预览中会显示为立柱。' },
+    { title: '⑥ 选择 / 修改已有元素', body: '选 <code>选择</code> 工具，点击元素即选中并<b>拖动</b>移动；选中后画布旁会弹出属性框，可改<b>颜色 / 名称 / 透明度</b>或删除。', tip: '快捷键：<code>Del</code> 删除选中，<code>Ctrl+Z</code> 撤销，右键点元素也可删除。' },
+    { title: '⑦ 管理多楼层', body: '在右侧「楼层」页可<b>添加 / 删除 / 切换</b>楼层。每层独立编辑，切换后画布即该层俯视图。', tip: '建议从 B1 往上逐层建模。每层的外墙 / 隔墙 / 区域 / 标注互不影响。' },
+    { title: '⑧ 预览 3D 并继续', body: '点右下角 <code>👁️ 预览 3D</code> 在 3D 视图查看建模结果。看过后点顶部提示的「← 返回编辑器」继续修改，或 <code>💾 保存</code> 项目。', tip: '随时 <code>💾 保存项目</code> / <code>📂 加载</code> 导出 JSON，下次可继续编辑。' }
+];
+let tutIdx = 0;
+function showTutorial(i) {
+    tutIdx = i || 0;
+    document.getElementById('tutorialOverlay')?.classList.add('show');
+    try { localStorage.setItem('edTutSeen', '1'); } catch(e) {}
+    renderTutorial();
+}
+function closeTutorial() { document.getElementById('tutorialOverlay')?.classList.remove('show'); }
+function nextTutorial() { if (tutIdx < tutorialSteps.length - 1) { tutIdx++; renderTutorial(); } else closeTutorial(); }
+function prevTutorial() { if (tutIdx > 0) { tutIdx--; renderTutorial(); } }
+function renderTutorial() {
+    const s = tutorialSteps[tutIdx];
+    if (!s) return;
+    const stepEl = document.getElementById('tutStep');
+    if (stepEl) stepEl.textContent = `教程 · 第 ${tutIdx + 1} / ${tutorialSteps.length} 步`;
+    document.getElementById('tutTitle').textContent = s.title;
+    document.getElementById('tutBody').innerHTML = s.body;
+    const tipEl = document.getElementById('tutTip');
+    if (tipEl) { tipEl.innerHTML = s.tip ? ('💡 ' + s.tip) : ''; tipEl.style.display = s.tip ? '' : 'none'; }
+    const prog = document.getElementById('tutProg');
+    if (prog) prog.innerHTML = tutorialSteps.map((_, k) => `<i class="${k <= tutIdx ? 'on' : ''}"></i>`).join('');
+    const prev = document.getElementById('tutPrev');
+    if (prev) prev.disabled = (tutIdx === 0);
+    const next = document.getElementById('tutNext');
+    if (next) next.textContent = (tutIdx === tutorialSteps.length - 1) ? '完成 ✓' : '下一步';
+}
+
+</script>
+
+<!-- ── Selected element properties popover ── -->
+<div class="ed-props" id="edProps">
+    <h5 id="edPropsTitle">属性 <span class="badge" id="edPropsType">—</span></h5>
+    <div class="pp-row">
+        <span class="pp-lbl">名称</span>
+        <input class="pp-input" id="edPropsName" placeholder="未命名" oninput="edPropsNameI()" />
+    </div>
+    <div class="pp-row">
+        <span class="pp-lbl">颜色</span>
+        <input type="color" class="pp-color" id="edPropsColor" oninput="edPropsColorI()" />
+    </div>
+    <div class="pp-row" id="edPropsAlphaRow">
+        <span class="pp-lbl">透明度</span>
+        <input type="range" class="pp-range" id="edPropsAlpha" min="0.05" max="1" step="0.05" value="0.4" oninput="edPropsAlphaI()" />
+    </div>
+    <button class="pp-del" onclick="edPropsDelete()">🗑 删除该元素</button>
+</div>
+
+<!-- ── 3D return hint ── -->
+<div id="edReturnHint">
+    <span class="ico">👁️</span>
+    <span>已生成 3D 预览。想继续编辑请返回建模编辑器。</span>
+    <button onclick="edReturnToEditor()">← 返回编辑器</button>
+</div>
+
+<!-- ── Tutorial overlay ── -->
+<div id="tutorialOverlay">
+    <div class="tut-card">
+        <div class="step" id="tutStep">教程 · 第 1 / 9 步</div>
+        <h3 id="tutTitle"></h3>
+        <p id="tutBody"></p>
+        <div class="tip" id="tutTip"></div>
+        <div class="tut-prog" id="tutProg"></div>
+        <div class="tut-actions">
+            <span class="left"><button class="tut-btn ghost" onclick="closeTutorial()" style="padding:6px 12px">跳过</button></span>
+            <div style="display:flex;gap:8px">
+                <button class="tut-btn ghost" id="tutPrev" onclick="prevTutorial()">上一步</button>
+                <button class="tut-btn" id="tutNext" onclick="nextTutorial()">下一步</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

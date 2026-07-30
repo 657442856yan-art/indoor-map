@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>高德地图展示</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+    #container { width: 100vw; height: 100vh; }
+    #panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.92);
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      font-size: 14px;
+      z-index: 999;
+      max-width: 280px;
+      backdrop-filter: blur(8px);
+    }
+    #panel h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+      border-bottom: 1.5px solid #eee;
+      padding-bottom: 8px;
+    }
+    #panel p { color: #666; line-height: 1.6; margin: 4px 0; }
+    #panel .label { color: #999; font-size: 12px; }
+    #panel .value { color: #222; font-weight: 500; }
+    #loading {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.9);
+      border-radius: 10px;
+      padding: 20px 32px;
+      font-size: 15px;
+      color: #555;
+      z-index: 1000;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    #tip {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 13px;
+      z-index: 999;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="container"></div>
+
+<div id="panel">
+  <h3>🗺️ 地图信息</h3>
+  <p><span class="label">当前城市</span><br><span class="value" id="city">定位中…</span></p>
+  <p><span class="label">中心坐标</span><br><span class="value" id="center">—</span></p>
+  <p><span class="label">当前缩放</span><br><span class="value" id="zoom">—</span></p>
+  <p><span class="label">提示</span><br><span class="value" style="font-size:12px;color:#999">点击地图可复制坐标</span></p>
+</div>
+
+<div id="loading">正在加载高德地图…</div>
+<div id="tip">🎉 地图加载成功！点击地图任意位置可复制坐标</div>
+
+<!-- 高德地图 JS API v2.0 -->
+<script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_KEY_HERE"></script>
+<script>
+const key = 'YOUR_KEY_HERE'; // ⬅️ 在此填入你的高德 Web API Key
+
+// 创建地图实例
+const map = new AMap.Map('container', {
+  zoom: 12,
+  mapStyle: 'amap://styles/normal',
+  viewMode: '2D',
+  pitch: 0,
+});
+
+// 加载 UI 组件（工具条、定位）
+AMap.plugin(['AMap.ToolBar', 'AMap.Geolocation', 'AMap.Scale'], function () {
+  map.addControl(new AMap.Scale());
+  const toolBar = new AMap.ToolBar({ position: 'right-bottom' });
+  map.addControl(toolBar);
+
+  const geolocation = new AMap.Geolocation({
+    enableHighAccuracy: true,
+    timeout: 8000,
+  });
+  map.addControl(geolocation);
+
+  // 自动定位当前城市
+  geolocation.getCurrentCity(function (status, result) {
+    document.getElementById('loading').style.display = 'none';
+    if (status === 'complete') {
+      const info = result.city || result.province || '未知地区';
+      document.getElementById('city').textContent = info;
+      // 定位成功，地图已自动移动到当前位置
+    } else {
+      document.getElementById('city').textContent = '定位失败';
+      console.error('Geolocation failed:', result);
+    }
+  });
+});
+
+// 实时显示中心坐标和缩放级别
+function updateInfo() {
+  const c = map.getCenter();
+  document.getElementById('center').textContent =
+    c.lng.toFixed(6) + ', ' + c.lat.toFixed(6);
+  document.getElementById('zoom').textContent = map.getZoom();
+}
+map.on('moveend', updateInfo);
+map.on('zoomend', updateInfo);
+updateInfo();
+
+// 点击地图复制坐标
+let tipTimer;
+map.on('click', function (e) {
+  const lng = e.lnglat.getLng().toFixed(6);
+  const lat = e.lnglat.getLat().toFixed(6);
+  const coordStr = lng + ',' + lat;
+  navigator.clipboard.writeText(coordStr).then(function () {
+    showTip('📋 坐标已复制: ' + coordStr);
+  }).catch(function () {
+    showTip('坐标: ' + coordStr);
+  });
+});
+
+function showTip(msg) {
+  const tip = document.getElementById('tip');
+  tip.textContent = msg;
+  tip.style.opacity = '1';
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(function () {
+    tip.style.opacity = '0';
+    tip.style.transition = 'opacity 1s';
+  }, 2500);
+}
+</script>
+
+</body>
+</html>

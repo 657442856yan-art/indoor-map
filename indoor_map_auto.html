@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>室内地图 · API自动获取真实坐标</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; overflow: hidden; }
+
+    /* ==== 通用 ==== */
+    .btn { border: none; border-radius: 8px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+    .btn-p { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; font-weight: 600; }
+    .btn-p:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(59,130,246,0.4); }
+    .btn-g { background: rgba(255,255,255,0.9); color: #333; font-weight: 500; border: 1.5px solid #e5e7eb; }
+    .btn-g:hover { background: #f0f4ff; border-color: #3b82f6; color: #3b82f6; }
+    .btn-d { background: #fee2e2; color: #ef4444; font-weight: 600; border: 1.5px solid #fecaca; }
+    .btn-d:hover { background: #fecaca; }
+
+    #container { width: 100vw; height: 100vh; }
+
+    /* ==== 顶部栏 ==== */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; height: 58px;
+      background: rgba(8, 16, 48, 0.92);
+      backdrop-filter: blur(16px);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; z-index: 999;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.35);
+      gap: 12px;
+    }
+    .logo { font-size: 17px; font-weight: 700; color: #fff; white-space: nowrap; }
+    .logo span { color: #00d4ff; }
+    .header-center { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; flex-wrap: wrap; }
+    .hdr-select {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+      color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px;
+      font-family: inherit; outline: none; cursor: pointer;
+    }
+    .hdr-select option { background: #0f1f3d; }
+    .hdr-select:focus { border-color: #00d4ff; }
+    .hdr-input {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+      color: #fff; border-radius: 8px; padding: 6px 14px; font-size: 13px;
+      font-family: inherit; outline: none; width: 200px;
+    }
+    .hdr-input::placeholder { color: rgba(255,255,255,0.4); }
+    .hdr-input:focus { border-color: #00d4ff; }
+    .badge {
+      font-size: 11px; padding: 3px 10px; border-radius: 12px; white-space: nowrap;
+      background: rgba(0,212,255,0.12); color: #00d4ff; border: 1px solid rgba(0,212,255,0.25);
+    }
+    .badge.nav { background: rgba(16,185,129,0.15); color: #10b981; border-color: rgba(16,185,129,0.3); }
+    .badge.edit { background: rgba(245,158,11,0.15); color: #f59e0b; border-color: rgba(245,158,11,0.3); }
+    .badge.load { background: rgba(99,102,241,0.15); color: #a5b4fc; border-color: rgba(99,102,241,0.3); }
+    .badge.ok { background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.3); }
+    .badge.warn { background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3); }
+
+    /* ==== 加载遮罩 ==== */
+    #loading {
+      position: fixed; inset: 0; background: #060d24;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 2000; transition: opacity 0.8s;
+    }
+    #loading.hide { opacity: 0; pointer-events: none; }
+    .loader-ring { width: 56px; height: 56px; border: 3px solid rgba(0,212,255,0.12); border-top-color: #00d4ff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text { color: rgba(255,255,255,0.65); font-size: 14px; letter-spacing: 1px; }
+    .loader-sub { color: rgba(255,255,255,0.3); font-size: 12px; margin-top: 8px; }
+    .loader-bar-wrap { width: 200px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 16px; overflow: hidden; }
+    .loader-bar { height: 100%; background: linear-gradient(90deg, #00d4ff, #6366f1); border-radius: 2px; transition: width 0.3s; width: 0%; }
+
+    /* ==== 左侧面板 ==== */
+    #panel {
+      position: fixed; top: 74px; left: 14px; width: 252px;
+      background: rgba(255,255,255,0.97); border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.13); z-index: 999;
+      backdrop-filter: blur(12px); display: flex; flex-direction: column; overflow: hidden;
+    }
+    .panel-head {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      padding: 12px 14px; color: #fff;
+    }
+    .panel-head .b-name { font-size: 14px; font-weight: 700; }
+    .panel-head .b-addr { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+    .panel-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .panel-stat { display: flex; gap: 0; border-bottom: 1px solid #f0f0f0; }
+    .stat-item { flex: 1; padding: 8px 10px; text-align: center; border-right: 1px solid #f0f0f0; }
+    .stat-item:last-child { border-right: none; }
+    .stat-num { font-size: 18px; font-weight: 800; color: #3b82f6; }
+    .stat-label { font-size: 10px; color: #999; margin-top: 1px; }
+
+    /* POI 列表 */
+    #poi-list-wrap { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .poi-cat { padding: 4px 14px; font-size: 10px; color: #999; letter-spacing: 0.5px; text-transform: uppercase; border-top: 1px solid #f5f5f5; margin-top: 4px; }
+    .poi-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 14px; cursor: pointer; transition: background 0.15s;
+      border-bottom: 1px solid rgba(0,0,0,0.03);
+    }
+    .poi-item:hover { background: #f0f4ff; }
+    .poi-item.selected { background: #eef2ff; border-left: 3px solid #3b82f6; padding-left: 11px; }
+    .poi-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+    .poi-info { flex: 1; min-width: 0; }
+    .poi-name { font-size: 13px; font-weight: 600; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .poi-meta { font-size: 11px; color: #999; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .poi-coord { font-size: 10px; color: #c0c0c0; margin-top: 1px; }
+
+    /* 分类筛选 */
+    .cat-filter { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+    .cat-btn { padding: 3px 9px; border-radius: 20px; border: 1px solid #e5e7eb; background: #fff; font-size: 11px; color: #666; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+    .cat-btn:hover { background: #f0f4ff; border-color: #3b82f6; color: #3b82f6; }
+    .cat-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+
+    /* 底部统计 */
+    .panel-foot { padding: 8px 14px; border-top: 1px solid #f0f0f0; background: #fafafa; font-size: 11px; color: #aaa; display: flex; justify-content: space-between; align-items: center; }
+
+    /* ==== 导航面板 ==== */
+    #nav-panel {
+      position: fixed; top: 74px; left: 14px; width: 252px;
+      background: rgba(255,255,255,0.98); border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.16); z-index: 999;
+      backdrop-filter: blur(12px); display: none; overflow: hidden;
+    }
+    #nav-panel.show { display: block; }
+    .nav-head { background: linear-gradient(135deg, #10b981, #059669); padding: 12px 14px; color: #fff; }
+    .nav-head .t { font-size: 14px; font-weight: 700; }
+    .nav-head .d { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+    #nav-body { padding: 10px 12px; max-height: 360px; overflow-y: auto; }
+    .dist-box { text-align: center; padding: 10px; background: #f8faff; border-radius: 10px; margin-bottom: 8px; }
+    .dist-n { font-size: 26px; font-weight: 900; color: #3b82f6; }
+    .dist-u { font-size: 12px; color: #888; margin-left: 2px; }
+    .dist-l { font-size: 11px; color: #bbb; }
+    .nav-step { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #f0f0f0; }
+    .nav-step:last-child { border-bottom: none; }
+    .s-icon { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 1px; }
+    .s-text { font-size: 12px; color: #333; line-height: 1.5; }
+    .s-floor { font-size: 11px; color: #3b82f6; font-weight: 600; }
+
+    /* ==== 右侧楼层 ==== */
+    #floor-panel {
+      position: fixed; top: 50%; right: 14px; transform: translateY(-50%);
+      background: rgba(255,255,255,0.97); border-radius: 14px;
+      padding: 8px 7px; box-shadow: 0 6px 30px rgba(0,0,0,0.13);
+      z-index: 999; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    }
+    .ft-title { font-size: 9px; color: #ccc; letter-spacing: 1px; margin-bottom: 3px; text-transform: uppercase; }
+    .ft-btn { width: 42px; height: 32px; border: none; border-radius: 7px; background: transparent; color: #555; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.18s; font-family: inherit; }
+    .ft-btn:hover { background: #eef2ff; color: #3b82f6; }
+    .ft-btn.active { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; box-shadow: 0 2px 8px rgba(59,130,246,0.4); }
+    .ft-sep { width: 26px; height: 1px; background: #eee; margin: 1px 0; }
+
+    /* ==== 底部栏 ==== */
+    #bottom-bar {
+      position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+      background: rgba(255,255,255,0.97); border-radius: 28px;
+      padding: 7px 10px; display: flex; gap: 6px;
+      box-shadow: 0 6px 30px rgba(0,0,0,0.13); z-index: 999;
+      backdrop-filter: blur(12px);
+    }
+    .bar-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+
+    /* ==== 提示 ==== */
+    #tip { position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); color: #fff; border-radius: 22px; padding: 9px 22px; font-size: 13px; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.4s; backdrop-filter: blur(8px); white-space: nowrap; }
+    #tip.show { opacity: 1; }
+
+    /* ==== 图例 ==== */
+    #legend { position: fixed; bottom: 26px; left: 14px; background: rgba(255,255,255,0.96); border-radius: 12px; padding: 10px 14px; font-size: 12px; color: #555; z-index: 999; box-shadow: 0 2px 12px rgba(0,0,0,0.08); backdrop-filter: blur(8px); }
+    #legend h4 { font-size: 10px; color: #bbb; margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .leg-item { display: flex; align-items: center; gap: 7px; margin: 3px 0; }
+    .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ==== 编辑提示 ==== */
+    #edit-tip { position: fixed; top: 66px; left: 50%; transform: translateX(-50%); background: rgba(245,158,11,0.95); color: #fff; border-radius: 18px; padding: 7px 18px; font-size: 13px; font-weight: 600; z-index: 998; pointer-events: none; display: none; }
+    #edit-tip.show { display: block; }
+
+    /* ==== API日志面板 ==== */
+    #api-log {
+      position: fixed; bottom: 80px; right: 14px; width: 280px;
+      background: rgba(0,0,0,0.88); border-radius: 12px; padding: 12px;
+      z-index: 999; display: none; max-height: 200px; overflow-y: auto;
+      backdrop-filter: blur(12px);
+    }
+    #api-log.show { display: block; }
+    #api-log h4 { color: #00d4ff; font-size: 12px; margin-bottom: 8px; }
+    .log-item { font-size: 11px; color: #aaa; margin: 2px 0; font-family: 'Courier New', monospace; }
+    .log-item.ok { color: #6ee7b7; }
+    .log-item.err { color: #fca5a5; }
+    .log-item.info { color: #a5b4fc; }
+    .log-item .ts { color: #555; margin-right: 6px; }
+
+    /* 滚动条美化 */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loader-ring"></div>
+  <div class="loader-text">正在连接高德 API…</div>
+  <div class="loader-sub">自动获取真实坐标 · 精确标注</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="load-bar"></div></div>
+</div>
+
+<div id="container"></div>
+
+<!-- 顶部栏 -->
+<div id="header">
+  <div class="logo">🗺️ <span>室内地图</span></div>
+  <div class="header-center">
+    <select class="hdr-select" id="b-select">
+      <option value="0">北京国贸中心</option>
+      <option value="1">上海IFC</option>
+      <option value="2">深圳万象城</option>
+      <option value="3">广州太古汇</option>
+      <option value="4">自定义建筑</option>
+    </select>
+    <input type="text" class="hdr-input" id="custom-name" placeholder="输入建筑名称搜索…" style="display:none">
+    <select class="hdr-select" id="type-select">
+      <option value="all">全类型</option>
+      <option value="餐饮服务">餐饮</option>
+      <option value="购物服务">购物</option>
+      <option value="体育休闲服务">运动</option>
+      <option value="医疗保健服务">医疗</option>
+      <option value="生活服务">生活</option>
+      <option value="住宿服务">住宿</option>
+    </select>
+    <span class="badge" id="mode-badge">⏳ 初始化中</span>
+  </div>
+  <div class="header-center">
+    <button class="btn btn-g" style="padding:6px 12px;font-size:12px" id="edit-btn" onclick="toggleEdit()">📍 标注</button>
+    <button class="btn btn-g" style="padding:6px 12px;font-size:12px" onclick="toggleLog()">📋 日志</button>
+  </div>
+</div>
+
+<!-- 左侧主面板 -->
+<div id="panel">
+  <div class="panel-head">
+    <div class="b-name" id="b-name">—</div>
+    <div class="b-addr" id="b-addr">—</div>
+  </div>
+  <div class="panel-body">
+    <div class="panel-stat">
+      <div class="stat-item"><div class="stat-num" id="stat-total">0</div><div class="stat-label">POI 总数</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-loaded">0</div><div class="stat-label">已加载</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-show">0</div><div class="stat-label">显示中</div></div>
+    </div>
+    <div class="cat-filter" id="cat-filter"></div>
+    <div id="poi-list-wrap"><div style="text-align:center;padding:30px 0;color:#d1d5db;font-size:13px">⏳ 正在从高德API获取坐标…</div></div>
+    <div class="panel-foot">
+      <span id="foot-info">等待API响应…</span>
+      <button class="btn btn-p" style="padding:3px 10px;font-size:11px" onclick="reQuery()">🔄 重试</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导航面板 -->
+<div id="nav-panel">
+  <div class="nav-head">
+    <div class="t">🧭 室内导航</div>
+    <div class="d" id="nav-dest">→ </div>
+  </div>
+  <div id="nav-body">
+    <div class="dist-box">
+      <span class="dist-n" id="dist-n">0</span><span class="dist-u">米</span>
+      <div class="dist-l">步行距离（约）</div>
+    </div>
+    <div id="nav-steps"></div>
+  </div>
+</div>
+
+<!-- 右侧楼层 -->
+<div id="floor-panel">
+  <div class="ft-title">楼层</div>
+</div>
+
+<!-- 底部栏 -->
+<div id="bottom-bar">
+  <button class="btn btn-d bar-btn" onclick="clearAll()">🗑️ 清除</button>
+  <button class="btn btn-p bar-btn" id="nav-btn" onclick="doNav()">🧭 导航</button>
+</div>
+
+<!-- 提示 -->
+<div id="tip"></div>
+<div id="edit-tip">📍 点击地图添加标注点</div>
+
+<!-- API 日志 -->
+<div id="api-log">
+  <h4>📋 API 请求日志</h4>
+  <div id="log-content"></div>
+</div>
+
+<!-- 图例 -->
+<div id="legend">
+  <h4>📌 图例</h4>
+  <div class="leg-item"><div class="leg-dot" style="background:#3b82f6"></div> 标注点</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ef4444"></div> 导航终点</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#10b981"></div> 起点</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#06b6d4"></div> 导航路径</div>
+</div>
+
+<!-- 高德地图 -->
+<script src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_KEY_HERE&plugin=AMap.IndoorMap,AMap.ToolBar,AMap.Scale,AMap.PlaceSearch"></script>
+<script>
+// ================================================================
+// ⚠️  请把 YOUR_KEY_HERE 替换为你的高德 Web API Key
+//    申请地址: https://console.amap.com/dev/key/app
+//    平台选择: Web端(JS API)
+// ================================================================
+
+// ================================================================
+// 建筑数据（每个建筑有中心点，用于API查询 + 室内图加载）
+// POI坐标通过 PlaceSearch API 实时获取，不写死
+// ================================================================
+const BUILDINGS = [
+  {
+    id: 0, name: '北京国贸中心', addr: '北京市朝阳区建国门外大街1号',
+    poiId: 'B000A856LJ', queryName: '国贸中心', city: '北京',
+    center: [116.466682, 39.923423],
+    floors: ['F4','F3','F2','F1','B1'],
+    floorIndoorIdx: [3, 2, 1, 0, -1],  // 对应 IndoorMap 楼层索引
+    defaultFloorIdx: 3,  // 默认 F1
+  },
+  {
+    id: 1, name: '上海IFC国际金融中心', addr: '上海市浦东新区世纪大道88号',
+    poiId: 'B000A857LB', queryName: 'IFC国际金融中心', city: '上海',
+    center: [121.514680, 31.236180],
+    floors: ['F4','F3','F2','F1','B1'],
+    floorIndoorIdx: [3, 2, 1, 0, -1],
+    defaultFloorIdx: 3,
+  },
+  {
+    id: 2, name: '深圳万象城', addr: '深圳市罗湖区宝安南路1881号',
+    poiId: 'B000A859LD', queryName: '万象城', city: '深圳',
+    center: [114.128370, 22.549820],
+    floors: ['F5','F4','F3','F2','F1','B1'],
+    floorIndoorIdx: [4, 3, 2, 1, 0, -1],
+    defaultFloorIdx: 4,
+  },
+  {
+    id: 3, name: '广州太古汇', addr: '广州市天河区天河路383号',
+    poiId: 'B000A860LE', queryName: '太古汇', city: '广州',
+    center: [113.331880, 23.136740],
+    floors: ['F4','F3','F2','F1','B1'],
+    floorIndoorIdx: [3, 2, 1, 0, -1],
+    defaultFloorIdx: 3,
+  },
+];
+
+// ================================================================
+// 全局状态
+// ================================================================
+let map, indoorMap;
+let currentBIdx = 0;
+let currentFloorIdx = 3;     // F1 = 索引3
+let isEditMode = false;
+let isNavMode = false;
+let navDest = null;
+let selectedPOI = null;
+
+// POI 数据（从API获取）
+let allPOIs = [];           // 当前建筑所有POI
+let filteredPOIs = [];      // 过滤后的POI
+let activeCat = 'all';
+
+// 地图标记
+let poiMarkers = [];       // POI标记数组
+let startMarker = null;
+let endMarker = null;
+let navPolyline = null;
+let userMarkers = [];
+let animTimer = null;
+
+// API状态
+let apiLoading = false;
+let loadProgress = 0;
+
+// ================================================================
+// 日志系统
+// ================================================================
+function log(msg, type = 'info') {
+  const el = document.getElementById('log-content');
+  const now = new Date();
+  const ts = now.toLocaleTimeString('zh-CN', { hour12: false });
+  const cls = { ok: 'ok', err: 'err', info: 'info' }[type] || '';
+  el.innerHTML = `<div class="log-item ${cls}"><span class="ts">${ts}</span>${msg}</div>` + el.innerHTML;
+  if (el.children.length > 50) el.removeChild(el.lastChild);
+}
+
+function toggleLog() {
+  document.getElementById('api-log').classList.toggle('show');
+}
+
+// ================================================================
+// 地图初始化
+// ================================================================
+log('开始初始化地图…', 'info');
+document.getElementById('load-bar').style.width = '10%';
+
+map = new AMap.Map('container', {
+  zoom: 19,
+  center: BUILDINGS[0].center,
+  viewMode: '2D',
+  mapStyle: 'amap://styles/normal',
+});
+
+log('地图实例创建完成', 'ok');
+
+AMap.plugin(['AMap.ToolBar', 'AMap.Scale', 'AMap.IndoorMap', 'AMap.PlaceSearch'], function () {
+  log('插件加载完成', 'ok');
+  document.getElementById('load-bar').style.width = '30%';
+
+  map.addControl(new AMap.Scale());
+  map.addControl(new AMap.ToolBar({ position: 'right-bottom' }));
+
+  indoorMap = new AMap.IndoorMap({ alwaysShow: true, opacity: 1 });
+  map.add(indoorMap);
+  log('IndoorMap 图层添加完成', 'ok');
+
+  // 事件绑定
+  indoorMap.on('floorchanged', onFloorChanged);
+  indoorMap.on('buildingchanged', onBuildingChanged);
+  map.on('click', onMapClick);
+  map.on('complete', onMapComplete);
+
+  // 初始化UI
+  renderFloorBtns();
+  updateBadge('⏳ 加载中', 'load');
+
+  // 加载第一个建筑
+  loadBuilding(0);
+
+  document.getElementById('load-bar').style.width = '50%';
+});
+
+// ================================================================
+// 地图完成加载
+// ================================================================
+function onMapComplete() {
+  log('地图渲染完成', 'ok');
+  setTimeout(() => {
+    document.getElementById('loading').classList.add('hide');
+    showTip('🏢 地图加载完成，正在获取真实坐标…');
+  }, 600);
+}
+
+// ================================================================
+// 加载建筑
+// ================================================================
+function loadBuilding(idx) {
+  log(`切换到建筑: ${BUILDINGS[idx].name}`, 'info');
+  currentBIdx = idx;
+  const b = BUILDINGS[idx];
+
+  // 更新UI
+  document.getElementById('b-name').textContent = b.name;
+  document.getElementById('b-addr').textContent = b.addr;
+  document.getElementById('stat-total').textContent = '0';
+  document.getElementById('stat-loaded').textContent = '0';
+  document.getElementById('stat-show').textContent = '0';
+  document.getElementById('foot-info').textContent = '正在请求高德API…';
+  document.getElementById('poi-list-wrap').innerHTML = '<div style="text-align:center;padding:30px 0;color:#d1d5db;font-size:13px">⏳ 正在从高德API获取真实坐标…</div>';
+  updateBadge('⏳ 查询API', 'load');
+
+  // 重置
+  clearAllMarkers();
+  hideNavPanel();
+  isNavMode = false;
+  navDest = null;
+  selectedPOI = null;
+  allPOIs = [];
+  filteredPOIs = [];
+  activeCat = 'all';
+
+  // 渲染楼层按钮
+  renderFloorBtns();
+
+  // 加载室内地图
+  indoorMap.showIndoorMap(b.poiId, b.floorIndoorIdx[b.defaultFloorIdx]);
+  currentFloorIdx = b.floorIndoorIdx[b.defaultFloorIdx];
+
+  // 移动地图
+  map.setCenter(b.center);
+  map.setZoom(19);
+  document.getElementById('load-bar').style.width = '60%';
+
+  // 通过 API 查询真实 POI
+  queryPOIByAPI(b);
+}
+
+// ================================================================
+// 核心：调用高德 PlaceSearch API 获取真实坐标
+// ================================================================
+function queryPOIByAPI(building) {
+  if (apiLoading) { log('上一次请求未完成，跳过', 'err'); return; }
+  apiLoading = true;
+  log(`PlaceSearch.searchNearBy: ${building.queryName} 半径200m`, 'info');
+
+  const ps = new AMap.PlaceSearch({
+    type: '餐饮服务|购物服务|生活服务|体育休闲服务|医疗保健服务|住宿服务|风景名胜|金融保险服务|科教文化服务',
+    city: building.city,
+    citylimit: true,
+    pageSize: 50,
+    pageIndex: 1,
+  });
+
+  // 在建筑中心点附近搜索（半径200米，覆盖室内范围）
+  ps.searchNearBy(building.queryName, building.center, 200, function (status, result) {
+    apiLoading = false;
+    log(`API响应状态: ${status}`, status === 'complete' ? 'ok' : 'err');
+    document.getElementById('load-bar').style.width = '80%';
+
+    if (status === 'complete' && result.poiList && result.poiList.pois) {
+      const pois = result.poiList.pois;
+      log(`✅ 获取到 ${pois.length} 个POI（第一页）`, 'ok');
+
+      // 如果有第二页，继续获取（最多100个）
+      const total = result.poiList.count || pois.length;
+      if (total > 50) {
+        log(`总共有 ${total} 个POI，正在加载更多…`, 'info');
+        ps.setPageIndex(2);
+        ps.searchNearBy(building.queryName, building.center, 200, function (s2, r2) {
+          if (s2 === 'complete' && r2.poiList && r2.poiList.pois) {
+            pois.push(...r2.poiList.pois);
+            log(`✅ 总共获取 ${pois.length} 个POI`, 'ok');
+          }
+          processPOIData(pois, building);
+        });
+      } else {
+        processPOIData(pois, building);
+      }
+    } else {
+      log(`❌ API无结果（该建筑POI数据可能不在高德数据库中）`, 'err');
+      document.getElementById('poi-list-wrap').innerHTML =
+        `<div style="text-align:center;padding:24px 16px;color:#f59e0b;font-size:13px">
+          ⚠️ 高德暂无该建筑的室内POI数据<br>
+          <span style="font-size:11px;color:#ccc">可点击「📍 标注」手动添加点位</span>
+        </div>`;
+      document.getElementById('foot-info').textContent = 'API无数据，请手动标注';
+      updateBadge('⚠️ 无数据', 'warn');
+      showTip('⚠️ 该建筑暂无POI数据，请使用标注功能');
+    }
+  });
+}
+
+// ================================================================
+// 处理POI数据：解析 → 转换 → 渲染
+// ================================================================
+function processPOIData(pois, building) {
+  log(`开始解析 ${pois.length} 个POI…`, 'info');
+
+  allPOIs = pois
+    .filter(p => p.location && p.location.lng && p.location.lat)
+    .map(p => {
+      const typeFull = p.type || '';
+      return {
+        name: p.name,
+        lng: parseFloat(p.location.lng),
+        lat: parseFloat(p.location.lat),
+        type: getTypeName(typeFull),
+        typeFull: typeFull,
+        address: p.address || '',
+        tel: p.tel || '',
+        icon: getIcon(typeFull),
+        color: getColor(typeFull),
+        distance: p.distance || 0,
+      };
+    });
+
+  // 按距离排序（越近的越可能是室内）
+  allPOIs.sort((a, b) => (a.distance || 999) - (b.distance || 999));
+
+  log(`✅ 解析完成，有效POI: ${allPOIs.length} 个`, 'ok');
+  document.getElementById('stat-total').textContent = allPOIs.length;
+  document.getElementById('stat-loaded').textContent = allPOIs.length;
+  document.getElementById('foot-info').textContent = `API获取成功 ${allPOIs.length} 个点`;
+  document.getElementById('load-bar').style.width = '100%';
+  updateBadge('✅ 已加载', 'ok');
+
+  // 渲染分类筛选
+  renderCatFilter();
+  // 默认显示全部
+  filterPOIs('all');
+}
+
+// ================================================================
+// 分类筛选
+// ================================================================
+function renderCatFilter() {
+  const cats = [...new Set(allPOIs.map(p => p.type))].filter(Boolean).sort();
+  const wrap = document.getElementById('cat-filter');
+  wrap.innerHTML = `
+    <button class="cat-btn ${activeCat === 'all' ? 'active' : ''}" onclick="filterPOIs('all')">全部</button>
+    ${cats.map(c => `<button class="cat-btn ${activeCat === c ? 'active' : ''}" onclick="filterPOIs('${c}')">${c}</button>`).join('')}
+  `;
+}
+
+function filterPOIs(cat) {
+  activeCat = cat;
+  filteredPOIs = cat === 'all' ? allPOIs : allPOIs.filter(p => p.type === cat);
+  document.getElementById('stat-show').textContent = filteredPOIs.length;
+
+  // 更新分类按钮状态
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent === (cat === 'all' ? '全部' : cat));
+  });
+
+  renderPOIMarkers();
+  renderPOIList();
+  log(`筛选 ${cat}，显示 ${filteredPOIs.length} 个POI`, 'info');
+}
+
+// ================================================================
+// 在地图上渲染 POI 标记（精确坐标！）
+// ================================================================
+function renderPOIMarkers() {
+  // 清除旧标记
+  poiMarkers.forEach(m => m.setMap(null));
+  poiMarkers = [];
+
+  filteredPOIs.forEach((poi, i) => {
+    const marker = new AMap.Marker({
+      position: [poi.lng, poi.lat],
+      zIndex: i + 1,
+      content: buildMarkerContent(poi, false),
+      offset: new AMap.Pixel(-16, -16),
+      extData: { idx: i, poi },
+    });
+
+    // 信息窗体
+    const iw = new AMap.InfoWindow({
+      content: buildInfoWindow(poi),
+      offset: new AMap.Pixel(0, -30),
+      closeWhenClickMap: true,
+    });
+
+    marker.on('click', () => {
+      selectPOIByIdx(i);
+      iw.open(map, marker.getPosition());
+    });
+
+    marker.setMap(map);
+    poiMarkers.push(marker);
+  });
+}
+
+function buildMarkerContent(poi, selected) {
+  const size = selected ? 38 : 32;
+  const offset = selected ? -19 : -16;
+  return `<div style="
+    background:#fff; border-radius:50%; width:${size}px; height:${size}px;
+    display:flex; align-items:center; justify-content:center; font-size:${selected ? 18 : 15}px;
+    box-shadow:0 2px 10px rgba(0,0,0,${selected ? 0.35 : 0.2});
+    border:2.5px solid ${poi.color}; cursor:pointer;
+    transition: all 0.2s;
+  ">${poi.icon}</div>`;
+}
+
+function buildInfoWindow(poi) {
+  return `<div style="padding:10px 12px;min-width:180px;max-width:240px">
+    <b style="font-size:14px">${poi.icon} ${poi.name}</b><br>
+    <span style="color:#888;font-size:12px">${poi.type}</span>
+    ${poi.address ? `<br><span style="color:#aaa;font-size:11px">${poi.address}</span>` : ''}
+    <div style="margin-top:6px;font-size:11px;color:#666">
+      📍 <span style="font-family:monospace">${poi.lng.toFixed(6)}, ${poi.lat.toFixed(6)}</span>
+    </div>
+    <div style="margin-top:6px;font-size:11px;color:#999">
+      距建筑中心约 ${poi.distance}m
+    </div>
+    <div style="margin-top:8px;display:flex;gap:4px">
+      <button onclick="selectPOIByIdx(${filteredPOIs.indexOf(poi)});map.clearInfoWindow();" style="flex:1;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px">🧭 去这里</button>
+      <button onclick="navigator.clipboard.writeText('${poi.lng.toFixed(6)},${poi.lat.toFixed(6)}');alert('坐标已复制')" style="flex:1;background:#f0f4ff;color:#3b82f6;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px">📋 复制</button>
+    </div>
+  </div>`;
+}
+
+// ================================================================
+// POI 列表渲染
+// ================================================================
+function renderPOIList() {
+  const wrap = document.getElementById('poi-list-wrap');
+  if (filteredPOIs.length === 0) {
+    wrap.innerHTML = '<div style="text-align:center;padding:24px;color:#d1d5db;font-size:13px">该分类暂无数据</div>';
+    return;
+  }
+
+  // 按类型分组显示
+  const groups = {};
+  filteredPOIs.forEach(p => {
+    if (!groups[p.type]) groups[p.type] = [];
+    groups[p.type].push(p);
+  });
+
+  let html = '';
+  Object.keys(groups).sort().forEach(type => {
+    html += `<div class="poi-cat">${type}</div>`;
+    groups[type].forEach(poi => {
+      const idx = filteredPOIs.indexOf(poi);
+      const sel = selectedPOI === poi ? 'selected' : '';
+      html += `
+        <div class="poi-item ${sel}" onclick="selectPOIByIdx(${idx})">
+          <div class="poi-icon" style="background:${poi.color}22;color:${poi.color}">${poi.icon}</div>
+          <div class="poi-info">
+            <div class="poi-name">${poi.name}</div>
+            <div class="poi-meta">${poi.type}${poi.address ? ' · ' + poi.address.slice(0,10) : ''}</div>
+            <div class="poi-coord">📍 ${poi.lng.toFixed(6)}, ${poi.lat.toFixed(6)} | 距中心${poi.distance}m</div>
+          </div>
+        </div>`;
+    });
+  });
+
+  wrap.innerHTML = html;
+}
+
+// ================================================================
+// 选中 POI
+// ================================================================
+function selectPOIByIdx(idx) {
+  const poi = filteredPOIs[idx];
+  if (!poi) return;
+
+  selectedPOI = poi;
+  map.setCenter([poi.lng, poi.lat]);
+
+  // 高亮标记
+  poiMarkers.forEach((m, i) => {
+    const p = filteredPOIs[i];
+    m.setContent(buildMarkerContent(p, p === poi));
+    m.setOffset(p === poi ? new AMap.Pixel(-19, -19) : new AMap.Pixel(-16, -16));
+    if (p === poi) m.setzIndex(9999);
+  });
+
+  // 高亮列表
+  renderPOIList();
+
+  log(`选中: ${poi.name} (${poi.lng.toFixed(6)}, ${poi.lat.toFixed(6)})`, 'ok');
+  showTip(`✅ 已选中：${poi.name}（点击「导航」开始路线）`);
+}
+
+// ================================================================
+// 导航
+// ================================================================
+function doNav() {
+  if (!selectedPOI) {
+    showTip('⚠️ 请先在列表中点击选择一个目标');
+    return;
+  }
+  startNavigation(selectedPOI);
+}
+
+function startNavigation(target) {
+  navDest = target;
+  isNavMode = true;
+  updateBadge('🧭 导航中', 'nav');
+
+  // 清除旧导航元素
+  [startMarker, endMarker, navPolyline].forEach(m => { if (m) m.setMap(null); });
+  startMarker = endMarker = navPolyline = null;
+  if (animTimer) clearInterval(animTimer);
+
+  const b = BUILDINGS[currentBIdx];
+
+  // 起点：建筑中心
+  startMarker = new AMap.Marker({
+    position: b.center,
+    content: `<div style="background:#10b981;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 10px rgba(16,185,129,0.5);border:2px solid #fff">🚩</div>`,
+    offset: new AMap.Pixel(-16, -16),
+  });
+  startMarker.setMap(map);
+
+  // 终点
+  endMarker = new AMap.Marker({
+    position: [target.lng, target.lat],
+    content: `<div style="background:#ef4444;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 10px rgba(239,68,68,0.5);border:2px solid #fff">🏁</div>`,
+    offset: new AMap.Pixel(-16, -16),
+  });
+  endMarker.setMap(map);
+
+  // 路径
+  renderNavPath(target, b.center);
+  map.setCenter([target.lng, target.lat]);
+
+  // 显示导航面板
+  showNavPanel(target, b.center);
+  showTip('🧭 导航已规划，点击地图可更换终点');
+}
+
+function renderNavPath(target, start) {
+  if (navPolyline) { navPolyline.setMap(null); }
+  if (animTimer) clearInterval(animTimer);
+
+  // 模拟路径：起点 → 偏置中点 → 终点（避免直线被理解成穿墙）
+  const s = start, e = [target.lng, target.lat];
+  const mid = [(s[0]+e[0])/2 + (Math.random()-0.5)*0.00008, (s[1]+e[1])/2 + (Math.random()-0.5)*0.00008];
+  const dist = calcDist(s[0], s[1], e[0], e[1]);
+
+  navPolyline = new AMap.Polyline({
+    path: [s, mid, e],
+    strokeColor: '#06b6d4',
+    strokeOpacity: 0.9,
+    strokeWeight: 5,
+    strokeStyle: 'solid',
+    borderWeight: 3,
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderOpacity: 0.7,
+  });
+  navPolyline.setMap(map);
+
+  // 流动虚线动画
+  let offset = 0;
+  animTimer = setInterval(() => {
+    offset = (offset + 1) % 20;
+    if (navPolyline) navPolyline.setOptions({ strokeDasharray: [offset, 20 - offset] });
+  }, 80);
+
+  document.getElementById('dist-n').textContent = Math.round(dist);
+}
+
+function showNavPanel(target, start) {
+  document.getElementById('nav-dest').textContent = '→ ' + target.name;
+  document.getElementById('nav-panel').classList.add('show');
+  document.getElementById('panel').style.display = 'none';
+
+  const steps = [
+    { icon: '🚩', bg: '#d1fae5', text: '从当前位置出发', floor: null },
+    { icon: '🚶', bg: '#eff6ff', text: '沿主通道步行', floor: null },
+    { icon: '🏁', bg: '#fee2e2', text: `到达：${target.name}`, floor: null },
+  ];
+  document.getElementById('nav-steps').innerHTML = steps.map(s => `
+    <div class="nav-step">
+      <div class="s-icon" style="background:${s.bg}">${s.icon}</div>
+      <div>
+        <div class="s-text">${s.text}</div>
+        ${s.floor ? `<div class="s-floor">📍 ${s.floor}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function hideNavPanel() {
+  document.getElementById('nav-panel').classList.remove('show');
+  document.getElementById('panel').style.display = 'block';
+}
+
+// ================================================================
+// 地图点击
+// ================================================================
+function onMapClick(e) {
+  const lng = e.lnglat.getLng();
+  const lat = e.lnglat.getLat();
+  document.getElementById('foot-info').textContent = `坐标: ${lng.toFixed(6)}, ${lat.toFixed(6)}`;
+
+  if (isEditMode) {
+    // 手动标注
+    const name = '标注 #' + (userMarkers.length + 1);
+    addUserMarker(lng, lat, name);
+    showTip(`📍 已标注: ${lng.toFixed(6)}, ${lat.toFixed(6)}`);
+  } else if (isNavMode) {
+    // 导航中点击更换终点
+    if (navDest) {
+      const newDest = { name: '自定义终点', lng, lat, type: '自定义', icon: '📍', color: '#ef4444' };
+      startNavigation(newDest);
+      showTip('🏁 已更换终点');
+    }
+  } else {
+    navigator.clipboard.writeText(`${lng.toFixed(6)},${lat.toFixed(6)}`).then(() => {
+      showTip(`📋 坐标已复制: ${lng.toFixed(6)}, ${lat.toFixed(6)}`);
+    });
+  }
+}
+
+// ================================================================
+// 手动标注
+// ================================================================
+function addUserMarker(lng, lat, name) {
+  const m = new AMap.Marker({
+    position: [lng, lat],
+    content: `<div style="background:#3b82f6;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 10px rgba(59,130,246,0.5);border:2px solid #fff">📍</div>`,
+    offset: new AMap.Pixel(-16, -16),
+  });
+  const iw = new AMap.InfoWindow({
+    content: `<div style="padding:8px">
+      <b>${name}</b><br>
+      <span style="font-size:11px;color:#888">${lng.toFixed(6)}, ${lat.toFixed(6)}</span><br>
+      <button onclick="navigator.clipboard.writeText('${lng.toFixed(6)},${lat.toFixed(6)}');alert('已复制')" style="margin-top:4px;background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px">📋 复制坐标</button>
+    </div>`,
+    offset: new AMap.Pixel(0, -30),
+    closeWhenClickMap: true,
+  });
+  m.on('click', () => iw.open(map, m.getPosition()));
+  m.setMap(map);
+  userMarkers.push(m);
+}
+
+// ================================================================
+// 清除
+// ================================================================
+function clearAll() {
+  if (animTimer) clearInterval(animTimer);
+  [startMarker, endMarker, navPolyline].forEach(m => { if (m) m.setMap(null); });
+  poiMarkers.forEach(m => m.setMap(null));
+  userMarkers.forEach(m => m.setMap(null));
+  startMarker = endMarker = navPolyline = null;
+  poiMarkers = [];
+  userMarkers = [];
+  navDest = null;
+  selectedPOI = null;
+  isNavMode = false;
+
+  hideNavPanel();
+  map.clearInfoWindow();
+  renderPOIMarkers();
+  renderPOIList();
+  updateBadge('✅ 已清除', 'ok');
+  log('清除所有标记', 'info');
+  showTip('✅ 已清除，可重新选择目标');
+}
+
+// ================================================================
+// 编辑模式
+// ================================================================
+function toggleEdit() {
+  isEditMode = !isEditMode;
+  document.getElementById('edit-tip').classList.toggle('show', isEditMode);
+  document.getElementById('edit-btn').style.background = isEditMode ? '#3b82f6' : '';
+  document.getElementById('edit-btn').style.color = isEditMode ? '#fff' : '';
+  map.setDefaultCursor(isEditMode ? 'crosshair' : '');
+  showTip(isEditMode ? '📍 标注模式：点击地图添加标注' : '已退出标注模式');
+  updateBadge(isEditMode ? '📍 标注' : '✅ 就绪', isEditMode ? 'edit' : 'ok');
+}
+
+// ================================================================
+// 楼层切换
+// ================================================================
+function renderFloorBtns() {
+  const b = BUILDINGS[currentBIdx];
+  const panel = document.getElementById('floor-panel');
+  panel.innerHTML = '<div class="ft-title">楼层</div>';
+  b.floors.forEach((name, i) => {
+    if (i > 0) { const s = document.createElement('div'); s.className = 'ft-sep'; panel.appendChild(s); }
+    const btn = document.createElement('button');
+    btn.className = 'ft-btn' + (i === b.defaultFloorIdx ? ' active' : '');
+    btn.textContent = name;
+    btn.dataset.i = i;
+    btn.onclick = () => switchFloor(i, btn);
+    panel.appendChild(btn);
+  });
+}
+
+function switchFloor(i, btn) {
+  const b = BUILDINGS[currentBIdx];
+  indoorMap.showIndoorMap(b.poiId, b.floorIndoorIdx[i]);
+  currentFloorIdx = b.floorIndoorIdx[i];
+  document.querySelectorAll('.ft-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  log(`切换楼层: ${b.floors[i]} (索引${b.floorIndoorIdx[i]})`, 'info');
+}
+
+// ================================================================
+// 事件回调
+// ================================================================
+function onFloorChanged(e) {
+  currentFloorIdx = e.floor;
+  const b = BUILDINGS[currentBIdx];
+  const fi = b.floorIndoorIdx.indexOf(e.floor);
+  const name = fi >= 0 ? b.floors[fi] : 'F' + e.floor;
+  document.querySelectorAll('.ft-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.i) === fi);
+  });
+}
+
+function onBuildingChanged(e) {
+  if (e.building) {
+    document.getElementById('b-name').textContent = e.building.name || BUILDINGS[currentBIdx].name;
+  }
+}
+
+// ================================================================
+// 重试
+// ================================================================
+function reQuery() {
+  loadBuilding(currentBIdx);
+}
+
+// ================================================================
+// 工具函数
+// ================================================================
+function getTypeName(typeFull) {
+  if (!typeFull) return '其他';
+  if (/餐饮|火锅|咖啡|快餐|餐厅|小吃/.test(typeFull)) return '餐饮';
+  if (/购物|服装|百货|超市|便利店/.test(typeFull)) return '购物';
+  if (/体育|健身|游泳|瑜伽|球场/.test(typeFull)) return '运动';
+  if (/医疗|医院|药店|诊所/.test(typeFull)) return '医疗';
+  if (/住宿|酒店|宾馆|公寓/.test(typeFull)) return '住宿';
+  if (/金融|银行|证券|保险/.test(typeFull)) return '金融';
+  if (/教育|培训|学校|书店/.test(typeFull)) return '教育';
+  if (/娱乐|影院|KTV|游乐/.test(typeFull)) return '娱乐';
+  return '其他';
+}
+
+function getIcon(typeFull) {
+  if (!typeFull) return '📍';
+  if (/餐饮|火锅|咖啡|快餐|餐厅/.test(typeFull)) return '🍜';
+  if (/服装|购物|百货|超市/.test(typeFull)) return '🛍️';
+  if (/体育|健身|瑜伽/.test(typeFull)) return '🏃';
+  if (/医疗|医院|药店/.test(typeFull)) return '🏥';
+  if (/住宿|酒店|宾馆/.test(typeFull)) return '🏨';
+  if (/金融|银行|证券/.test(typeFull)) return '🏦';
+  if (/教育|培训|书店/.test(typeFull)) return '📚';
+  if (/娱乐|影院|KTV/.test(typeFull)) return '🎬';
+  if (/娱乐|游乐/.test(typeFull)) return '🎮';
+  if (/交通|出口|入口/.test(typeFull)) return '🚪';
+  return '📍';
+}
+
+function getColor(typeFull) {
+  if (!typeFull) return '#6b7280';
+  if (/餐饮|火锅|咖啡/.test(typeFull)) return '#f59e0b';
+  if (/购物|服装|百货/.test(typeFull)) return '#8b5cf6';
+  if (/体育|健身/.test(typeFull)) return '#10b981';
+  if (/医疗|医院/.test(typeFull)) return '#ef4444';
+  if (/住宿|酒店/.test(typeFull)) return '#6366f1';
+  if (/金融|银行/.test(typeFull)) return '#3b82f6';
+  if (/教育|培训|书店/.test(typeFull)) return '#f97316';
+  if (/娱乐|影院/.test(typeFull)) return '#ec4899';
+  if (/交通|出口/.test(typeFull)) return '#06b6d4';
+  return '#6b7280';
+}
+
+function calcDist(lng1, lat1, lng2, lat2) {
+  const dx = (lng2-lng1)*111000*Math.cos((lat1+lat2)/2*Math.PI/180);
+  const dy = (lat2-lat1)*111000;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function updateBadge(text, cls) {
+  const b = document.getElementById('mode-badge');
+  b.textContent = text;
+  b.className = 'badge ' + (cls || '');
+}
+
+let tipTimer;
+function showTip(msg) {
+  const t = document.getElementById('tip');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ================================================================
+// 事件绑定
+// ================================================================
+document.getElementById('b-select').onchange = function() {
+  const v = parseInt(this.value);
+  if (v < 4) {
+    document.getElementById('custom-name').style.display = 'none';
+    loadBuilding(v);
+  } else {
+    document.getElementById('custom-name').style.display = 'inline-block';
+    document.getElementById('custom-name').focus();
+  }
+};
+
+document.getElementById('custom-name').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && this.value.trim()) {
+    const name = this.value.trim();
+    log(`自定义搜索: ${name}`, 'info');
+    const b = { ...BUILDINGS[0], name, queryName: name, addr: '自定义位置' };
+    clearAllMarkers();
+    document.getElementById('b-name').textContent = name;
+    document.getElementById('b-addr').textContent = '自定义位置';
+    updateBadge('⏳ 查询中', 'load');
+    map.setCenter([116.4, 39.9]);
+    queryPOIByAPI(b);
+  }
+});
+
+document.getElementById('type-select').onchange = function() {
+  const t = this.value;
+  if (t === 'all') {
+    filterPOIs('all');
+  } else {
+    filterPOIs(getTypeName(t));
+  }
+};
+
+// 初始提示
+setTimeout(() => log('初始化完成，等待建筑切换…', 'ok'), 500);
+</script>
+
+</body>
+</html>
