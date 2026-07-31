@@ -728,6 +728,31 @@
         .cp-hint.enh b { color: #5fe; }
         .cp-hint.enh .next { display: block; margin-top: 6px; color: #9fd; font-size: 11.5px; }
         .flash-ring { box-shadow: 0 0 0 3px #00d4ff !important; transition: box-shadow 0.3s; }
+
+        /* ===== 上传数据生成建模 ===== */
+        .cp-upload { width: 100%; padding: 10px 0; border: 1px dashed #00d4ff; border-radius: 10px; background: rgba(0, 212, 255, 0.12); color: #aef6ff; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .cp-upload:hover { background: rgba(0, 212, 255, 0.22); transform: scale(1.02); }
+        .data-modal { position: fixed; inset: 0; z-index: 9998; display: none; align-items: center; justify-content: center; background: rgba(2, 8, 20, 0.72); backdrop-filter: blur(3px); }
+        .data-modal.show { display: flex; animation: fadeIn 0.2s ease; }
+        .data-modal-box { width: min(680px, 92vw); max-height: 88vh; display: flex; flex-direction: column; background: linear-gradient(160deg, #0c1a30, #0a1424); border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 16px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6); overflow: hidden; }
+        .data-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(0, 212, 255, 0.1); color: #cdf3ff; font-size: 15px; font-weight: 700; }
+        .data-close { background: none; border: none; color: #9fd; font-size: 18px; cursor: pointer; line-height: 1; }
+        .data-modal-body { padding: 16px 18px; overflow: auto; }
+        .data-tip { margin: 0 0 14px; color: #9fb6cf; font-size: 12.5px; line-height: 1.6; }
+        .data-tip code { background: rgba(0, 212, 255, 0.14); padding: 1px 5px; border-radius: 4px; color: #aef; }
+        .data-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+        .data-file-btn { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 8px; background: rgba(0, 212, 255, 0.18); color: #aef6ff; font-size: 13px; cursor: pointer; border: 1px solid rgba(0, 212, 255, 0.4); }
+        .data-file-btn:hover { background: rgba(0, 212, 255, 0.3); }
+        .data-btn { padding: 8px 14px; border-radius: 8px; background: rgba(255, 255, 255, 0.07); color: #cfe; font-size: 13px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.16); }
+        .data-btn:hover { background: rgba(255, 255, 255, 0.14); }
+        .data-text { width: 100%; height: 220px; resize: vertical; box-sizing: border-box; background: #06101e; color: #d6f0ff; border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 10px; padding: 10px 12px; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; outline: none; }
+        .data-msg { min-height: 18px; margin-top: 10px; font-size: 12.5px; }
+        .data-msg.ok { color: #6ee7a8; }
+        .data-msg.err { color: #ff7a7d; }
+        .data-modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+        .data-btn-ghost { padding: 9px 18px; border-radius: 9px; background: transparent; color: #9fb6cf; font-size: 13px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .data-btn-primary { padding: 9px 20px; border-radius: 9px; background: linear-gradient(90deg, #00d4ff, #7b2cbf); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; border: none; box-shadow: 0 4px 16px rgba(0, 212, 255, 0.35); }
+        .data-btn-primary:hover { filter: brightness(1.1); }
     </style>
 </head>
 <body>
@@ -927,6 +952,9 @@
             <div class="cp-actions">
                 <button class="cp-clear" onclick="clearAllModeling()">🧹 一键清空建模</button>
                 <button class="cp-generate" onclick="generateAllModeling()">🏗 一键生成建模</button>
+            </div>
+            <div class="cp-actions">
+                <button class="cp-upload" onclick="openDataModal()">📥 上传数据生成</button>
             </div>
             <div class="cp-divider"></div>
             <div class="cp-sub">编辑工具 <span class="cp-floor">当前层：<b id="cpEditFloor">F1</b></span></div>
@@ -3088,6 +3116,211 @@
             rebuildIndoor();
         }
 
+        // ===== 上传室内数据生成建模 =====
+        const _UPLOAD_CATS = ['shopping', 'dining', 'entertainment', 'parking'];
+        const _UPLOAD_FACS = ['elevator', 'escalator', 'stairs', 'fountain'];
+        const _UPLOAD_SHAPES = ['rect', 'circle', 'L', 'T', 'U', 'cross', 'arc'];
+        function _num(v, def) { const n = Number(v); return isFinite(n) ? n : def; }
+
+        // 打开 / 关闭数据模态框
+        function openDataModal() { const m = document.getElementById('dataModal'); if (m) m.classList.add('show'); }
+        function closeDataModal() { const m = document.getElementById('dataModal'); if (m) m.classList.remove('show'); }
+
+        // 选择文件后读入文本框
+        function handleDataFile(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function () {
+                const ta = document.getElementById('dataText'); if (ta) ta.value = reader.result;
+                const msg = document.getElementById('dataMsg');
+                if (msg) { msg.textContent = '已读取文件：' + file.name + '（' + reader.result.length + ' 字符）'; msg.className = 'data-msg ok'; }
+            };
+            reader.onerror = function () {
+                const msg = document.getElementById('dataMsg');
+                if (msg) { msg.textContent = '文件读取失败'; msg.className = 'data-msg err'; }
+            };
+            reader.readAsText(file);
+        }
+
+        // 解析文本框内容并载入
+        function loadIndoorDataFromText() {
+            const ta = document.getElementById('dataText');
+            const msg = document.getElementById('dataMsg');
+            const text = (ta && ta.value || '').trim();
+            if (!text) { if (msg) { msg.textContent = '请先选择文件或粘贴 JSON 数据'; msg.className = 'data-msg err'; } return; }
+            let data;
+            try { data = JSON.parse(text); }
+            catch (e) { if (msg) { msg.textContent = 'JSON 解析失败：' + e.message; msg.className = 'data-msg err'; } return; }
+            try {
+                applyUploadedData(data);
+                if (msg) { msg.textContent = '载入成功！已按数据生成建模。'; msg.className = 'data-msg ok'; }
+            } catch (e) {
+                if (msg) { msg.textContent = '数据校验失败：' + e.message; msg.className = 'data-msg err'; }
+            }
+        }
+
+        // 核心：把上传/随机数据映射为建模状态并渲染
+        function applyUploadedData(data) {
+            if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('数据格式错误：顶层应为对象');
+            const b = data.building || {};
+            indoorConfig.W = _num(b.W, 140);
+            indoorConfig.D = _num(b.D, 100);
+            indoorConfig.FH = _num(b.FH, 20);
+            indoorConfig.atrium = b.atrium !== false;
+            indoorConfig.labels = b.labels !== false;
+            indoorConfig.autoRotate = !!b.autoRotate;
+            indoorConfig.footprint = (Array.isArray(b.footprint) && b.footprint.length >= 3)
+                ? b.footprint.map(p => ({ x: _num(p.x, 0), z: _num(p.z, 0) })) : null;
+
+            const floorsIn = Array.isArray(data.floors) ? data.floors : [];
+            if (!floorsIn.length) throw new Error('数据至少应包含 1 个楼层（floors 数组非空）');
+
+            const usedNames = {};
+            floorData = floorsIn.map((fl, i) => {
+                let name = fl.name || ('L' + (i + 1));
+                if (usedNames[name]) name = name + '_' + i;
+                usedNames[name] = true;
+                return {
+                    name: name,
+                    display: fl.display || ('第' + (i + 1) + '层'),
+                    type: _UPLOAD_CATS.indexOf(fl.type) >= 0 ? fl.type : 'shopping',
+                    desc: fl.desc || ''
+                };
+            });
+
+            // 重置编辑态：清空默认网格，仅渲染上传内容
+            indoorEdit = { floors: {} };
+            indoorEdit.cleared = true;
+
+            let totalShops = 0, totalWalls = 0, totalFacs = 0;
+            floorsIn.forEach((fl, i) => {
+                const name = floorData[i].name;
+                const fe = floorEdit(name);
+                if (fl.COLS != null) fe.COLS = _num(fl.COLS, indoorConfig.COLS);
+                if (fl.ROWS != null) fe.ROWS = _num(fl.ROWS, indoorConfig.ROWS);
+                if (typeof fl.atrium === 'boolean') fe.atrium = fl.atrium;
+                if (Array.isArray(fl.footprint) && fl.footprint.length >= 3)
+                    fe.footprint = fl.footprint.map(p => ({ x: _num(p.x, 0), z: _num(p.z, 0) }));
+
+                fe.customShops = (Array.isArray(fl.shops) ? fl.shops : []).map((s, j) => {
+                    totalShops++;
+                    return {
+                        id: s.id || ('c' + Date.now() + '_' + i + '_' + j),
+                        name: s.name || ('店铺' + (j + 1)),
+                        cat: _UPLOAD_CATS.indexOf(s.cat) >= 0 ? s.cat : 'shopping',
+                        x: _num(s.x, 0), z: _num(s.z, 0),
+                        w: _num(s.w, 12), d: _num(s.d, 12),
+                        shape: _UPLOAD_SHAPES.indexOf(s.shape) >= 0 ? s.shape : 'rect',
+                        rot: _num(s.rot, 0)
+                    };
+                });
+                fe.walls = (Array.isArray(fl.walls) ? fl.walls : []).map(w => {
+                    totalWalls++;
+                    return { x1: _num(w.x1, 0), z1: _num(w.z1, 0), x2: _num(w.x2, 0), z2: _num(w.z2, 0), floor: name };
+                });
+                fe.facilities = (Array.isArray(fl.facilities) ? fl.facilities : []).map(fc => {
+                    totalFacs++;
+                    return { type: _UPLOAD_FACS.indexOf(fc.type) >= 0 ? fc.type : 'elevator', x: _num(fc.x, 0), z: _num(fc.z, 0), floor: name };
+                });
+            });
+
+            // 保证能进入 3D（未选商场时也能直接载入）
+            currentBuildingInfo = currentBuildingInfo || {};
+            currentBuildingInfo.name = b.name || (currentBuildingInfo && currentBuildingInfo.name) || '自定义商场';
+            currentBuildingInfo.address = b.address || (currentBuildingInfo && currentBuildingInfo.address) || '';
+            if (!currentBuilding) currentBuilding = '__uploaded__';
+
+            if (indoor.active) {
+                indoor.current = 0;
+                rebuildIndoor();
+                if (typeof renderFloorList === 'function') renderFloorList();
+                if (typeof renderMapFloorControl === 'function') renderMapFloorControl();
+            } else {
+                enterMall();
+            }
+            closeDataModal();
+            updateStatus('已按数据生成建模：' + floorData.length + ' 层 / ' + totalShops + ' 店铺 / ' + totalWalls + ' 墙 / ' + totalFacs + ' 设施', 'success');
+        }
+
+        // 下载数据模板
+        function downloadTemplate() {
+            const tpl = {
+                building: { name: '示例商场', address: '', W: 140, D: 100, FH: 20, COLS: 8, ROWS: 6, atrium: true, labels: true, footprint: null },
+                floors: [
+                    {
+                        name: 'L1', display: '1层', type: 'shopping', desc: '购物', COLS: 8, ROWS: 6,
+                        shops: [
+                            { name: '优衣库', cat: 'shopping', x: -40, z: 20, w: 20, d: 16, shape: 'rect', rot: 0 },
+                            { name: '星巴克', cat: 'dining', x: 30, z: -20, w: 14, d: 14, shape: 'circle', rot: 0 }
+                        ],
+                        walls: [{ x1: -50, z1: 0, x2: 50, z2: 0 }],
+                        facilities: [{ type: 'elevator', x: 0, z: 0 }, { type: 'escalator', x: 20, z: 30 }]
+                    }
+                ]
+            };
+            const blob = new Blob([JSON.stringify(tpl, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'indoor_template.json';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }
+
+        // 随机数接口：生成随机样例室内数据（演示 / 测试用）
+        function generateRandomIndoorData() {
+            const rnd = (a, b) => a + Math.random() * (b - a);
+            const ri = (a, b) => Math.floor(rnd(a, b + 1));
+            const W = ri(110, 200), D = ri(80, 160), FH = ri(16, 26);
+            const nFloors = ri(3, 7);
+            const floors = [];
+            for (let i = 0; i < nFloors; i++) {
+                const type = _UPLOAD_CATS[ri(0, 3)];
+                const COLS = ri(5, 10), ROWS = ri(4, 8);
+                const cellW = W / COLS, cellD = D / ROWS;
+                const shops = [];
+                for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
+                    if (Math.random() < 0.12) continue; // 随机空缺
+                    const x = -W / 2 + cellW * (c + 0.5);
+                    const z = -D / 2 + cellD * (r + 0.5);
+                    const cat = pickCategory(type);
+                    const shapes = ['rect', 'rect', 'circle', 'L', 'T', 'U', 'cross', 'arc'];
+                    const shape = shapes[ri(0, shapes.length - 1)];
+                    const w = +(cellW * rnd(0.6, 0.92)).toFixed(1);
+                    const d = +(cellD * rnd(0.6, 0.92)).toFixed(1);
+                    const rot = ri(0, 7) * 45;
+                    shops.push({ name: pickBrand(cat), cat: cat, x: +x.toFixed(1), z: +z.toFixed(1), w: w, d: d, shape: shape, rot: rot });
+                }
+                const facilities = [];
+                const nFac = ri(1, 4);
+                for (let k = 0; k < nFac; k++) facilities.push({ type: _UPLOAD_FACS[ri(0, 3)], x: +rnd(-W / 2 + 8, W / 2 - 8).toFixed(1), z: +rnd(-D / 2 + 8, D / 2 - 8).toFixed(1) });
+                const walls = [];
+                const nW = ri(0, 5);
+                for (let k = 0; k < nW; k++) {
+                    const x1 = rnd(-W / 2 + 10, W / 2 - 10), z1 = rnd(-D / 2 + 10, D / 2 - 10), len = rnd(10, 30), ang = rnd(0, Math.PI);
+                    walls.push({ x1: +x1.toFixed(1), z1: +z1.toFixed(1), x2: +(x1 + Math.cos(ang) * len).toFixed(1), z2: +(z1 + Math.sin(ang) * len).toFixed(1) });
+                }
+                floors.push({ name: 'L' + (i + 1), display: (i + 1) + '层', type: type, desc: '随机生成', COLS: COLS, ROWS: ROWS, shops: shops, facilities: facilities, walls: walls });
+            }
+            return {
+                building: { name: '随机样例商场 ' + new Date().toLocaleDateString(), address: '', W: W, D: D, FH: FH, COLS: floors[0].COLS, ROWS: floors[0].ROWS, atrium: true, labels: true, footprint: null },
+                floors: floors
+            };
+        }
+
+        // 生成随机样例并直接载入
+        function loadRandomIndoorData() {
+            const data = generateRandomIndoorData();
+            const ta = document.getElementById('dataText');
+            if (ta) ta.value = JSON.stringify(data, null, 2);
+            const msg = document.getElementById('dataMsg');
+            try {
+                applyUploadedData(data);
+                if (msg) { msg.textContent = '已生成随机样例并载入（' + data.floors.length + ' 层）'; msg.className = 'data-msg ok'; }
+            } catch (e) {
+                if (msg) { msg.textContent = '生成失败：' + e.message; msg.className = 'data-msg err'; }
+            }
+        }
+
         // 页面加载完成后初始化地图
         window.addEventListener('load', function() {
             setTimeout(initMap, 500);
@@ -3165,6 +3398,30 @@
                 <button class="tut-skip" onclick="closeTutorial()">跳过</button>
                 <button id="tutPrev" onclick="tutPrev()">上一步</button>
                 <button class="primary" id="tutNext" onclick="tutNext()">下一步</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传室内数据生成建模 -->
+    <div class="data-modal" id="dataModal">
+        <div class="data-modal-box">
+            <div class="data-modal-head">
+                <span>📥 上传室内数据生成建模</span>
+                <button class="data-close" onclick="closeDataModal()">✕</button>
+            </div>
+            <div class="data-modal-body">
+                <p class="data-tip">支持 <code>.json</code> 文件或粘贴 JSON 文本。数据将<b>覆盖当前建模</b>，按楼层 / 店铺 / 墙 / 设施生成 3D 模型。也可点「🎲 随机样例」一键生成演示数据（基于随机数接口）。格式说明：<code>building</code> 含尺寸，<code>floors[]</code> 每层含 <code>shops/walls/facilities</code>。</p>
+                <div class="data-row">
+                    <label class="data-file-btn">选择 JSON 文件<input type="file" id="dataFile" accept=".json,application/json" onchange="handleDataFile(this)" style="display:none"></label>
+                    <button class="data-btn" onclick="downloadTemplate()">⬇ 下载模板</button>
+                    <button class="data-btn" onclick="loadRandomIndoorData()">🎲 随机样例</button>
+                </div>
+                <textarea id="dataText" class="data-text" placeholder="在此粘贴室内数据 JSON，或选择文件后自动填入…"></textarea>
+                <div class="data-msg" id="dataMsg"></div>
+            </div>
+            <div class="data-modal-foot">
+                <button class="data-btn-ghost" onclick="closeDataModal()">取消</button>
+                <button class="data-btn-primary" onclick="loadIndoorDataFromText()">载入并生成建模</button>
             </div>
         </div>
     </div>
