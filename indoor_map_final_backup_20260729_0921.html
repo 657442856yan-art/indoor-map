@@ -609,6 +609,12 @@
             background: linear-gradient(135deg, #ff4d4f, #b91c1c); color: #fff;
         }
         .cp-clear:hover { transform: scale(1.03); box-shadow: 0 0 14px rgba(255, 77, 79, 0.5); }
+        .cp-generate {
+            flex: 1; padding: 11px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 700; transition: all 0.2s;
+            background: linear-gradient(135deg, #00d4ff, #0a84ff); color: #04121f;
+        }
+        .cp-generate:hover { transform: scale(1.03); box-shadow: 0 0 14px rgba(0, 212, 255, 0.5); }
         .cp-divider { height: 1px; background: rgba(0, 212, 255, 0.25); margin: 16px 0 10px; }
         .cp-sub { font-size: 13px; color: #00d4ff; font-weight: 700; margin-bottom: 8px; }
         .cp-draw, .cp-draw-ok, .cp-draw-cancel {
@@ -914,6 +920,7 @@
             </div>
             <div class="cp-actions">
                 <button class="cp-clear" onclick="clearAllModeling()">🧹 一键清空建模</button>
+                <button class="cp-generate" onclick="generateAllModeling()">🏗 一键生成建模</button>
             </div>
             <div class="cp-divider"></div>
             <div class="cp-sub">编辑工具 <span class="cp-floor">当前层：<b id="cpEditFloor">F1</b></span></div>
@@ -2277,8 +2284,15 @@
                 const entry = floors[indoor.current].shops.find(s => s.data.id === editDrag.id);
                 if (entry) {
                     const fe = floorEdit(curFloorName());
-                    fe.shopOverrides = fe.shopOverrides || {};
-                    fe.shopOverrides[editDrag.id] = { x: entry.data.x, z: entry.data.z, cat: entry.data.cat, name: entry.data.name };
+                    const id = editDrag.id;
+                    if (id.charAt(0) === 'c') {
+                        // 新增（自定义）店铺：坐标直接存于 customShops，需就地更新其 x/z 才能持久
+                        const cs = (fe.customShops || []).find(s => s.id === id);
+                        if (cs) { cs.x = entry.data.x; cs.z = entry.data.z; }
+                    } else {
+                        fe.shopOverrides = fe.shopOverrides || {};
+                        fe.shopOverrides[id] = { x: entry.data.x, z: entry.data.z, cat: entry.data.cat, name: entry.data.name };
+                    }
                 }
                 editDrag = null;
                 if (indoor.controls) indoor.controls.enabled = true;
@@ -2819,8 +2833,10 @@
             const bbox = fl ? fl.bbox : { minX: -indoorConfig.W / 2, maxX: indoorConfig.W / 2, minZ: -indoorConfig.D / 2, maxZ: indoorConfig.D / 2 };
             const id = 'c' + Date.now();
             fe.customShops.push({ id, name: '新店铺', cat: 'shopping', x: 0, z: 0, w: 12, d: 12 });
-            updateStatus('已新增店铺（拖拽可移动，右侧可改色）', 'success');
+            updateStatus('已新增店铺：已切到「编辑店铺」模式，在 3D 中按住该店铺即可自由拖动到任意位置', 'success');
             rebuildIndoor();
+            // 重建后自动进入编辑店铺模式，方便立即拖动新店（拖拽无需先选中，点中即拖）
+            setEditMode('shop');
         }
         function deleteSelectedShop() {
             if (!editSelShopId) { updateStatus('请先点选一个店铺', 'error'); return; }
@@ -2884,6 +2900,15 @@
             syncCustomPanel();
             updateStatus('已清空全部建模，可重新设计', 'success');
             markQS('size');
+            rebuildIndoor();
+        }
+        // 一键生成默认/真实自动店铺网格（清空后的反向操作），保留用户已有自定义店铺/墙/设施
+        function generateAllModeling() {
+            // 清除 cleared 标记即可恢复自动网格生成；不直接重置 floors，避免清掉用户已加内容
+            indoorEdit.cleared = false;
+            syncCustomPanel();
+            updateStatus('已生成默认建模网格，可继续编辑', 'success');
+            markQS('shop');
             rebuildIndoor();
         }
 
