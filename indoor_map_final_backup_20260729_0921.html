@@ -950,6 +950,9 @@
                         <button class="cp-shape" data-shape="circle" onclick="setShopShape('circle')">● 圆形</button>
                         <button class="cp-shape" data-shape="L" onclick="setShopShape('L')">⌐ L形</button>
                         <button class="cp-shape" data-shape="T" onclick="setShopShape('T')">⊤ T形</button>
+                        <button class="cp-shape" data-shape="U" onclick="setShopShape('U')">⌔ U形</button>
+                        <button class="cp-shape" data-shape="cross" onclick="setShopShape('cross')">✚ 十字</button>
+                        <button class="cp-shape" data-shape="arc" onclick="setShopShape('arc')">◠ 弧形</button>
                     </div>
                     <div class="cp-sub2">店铺尺寸（米）</div>
                     <div class="cp-field">
@@ -960,7 +963,12 @@
                         <label>进深 <span id="valShopD">12</span></label>
                         <input type="range" id="shopD" min="4" max="40" step="1" value="12" oninput="onShopSizeInput()" onchange="onShopSizeChange()">
                     </div>
-                    <div class="cp-hint" id="shopEditHint">先点选一个店铺（按住可拖动），再调整其形状与尺寸。</div>
+                    <div class="cp-sub2">旋转朝向</div>
+                    <div class="cp-field">
+                        <label>角度 <span id="valShopRot">0</span>°</label>
+                        <input type="range" id="shopRot" min="0" max="360" step="5" value="0" oninput="onShopRotInput()" onchange="onShopRotChange()">
+                    </div>
+                    <div class="cp-hint" id="shopEditHint">先点选一个店铺（按住可拖动），再调整其形状、尺寸与朝向。</div>
                 </div>
                 <div class="cp-actions">
                     <button class="cp-mini" onclick="addShopHere()">➕ 新增</button>
@@ -2043,30 +2051,55 @@
                 return m;
             }
             // 按形状生成店铺网格：矩形=Box（中心在 localY）；圆形=Cylinder（中心在 localY）；L/T=ExtrudeGeometry（底面在 localY-shopH/2，顶在 localY+shopH/2，与矩形顶部对齐）
-            function shopShapeGeo(type, w, d, shopH, mat, x, z, localY) {
-                let mesh;
-                if (type === 'circle') {
-                    mesh = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, shopH, 30), mat);
-                    mesh.position.set(x, localY, z);
-                } else if (type === 'L' || type === 'T') {
-                    const hw = w / 2, hd = d / 2;
-                    const shp = new THREE.Shape();
-                    if (type === 'L') {
-                        const a = w * 0.42, b = d * 0.42;
-                        shp.moveTo(-hw, -hd); shp.lineTo(-hw + a, -hd); shp.lineTo(-hw + a, hd - b);
-                        shp.lineTo(hw, hd - b); shp.lineTo(hw, hd); shp.lineTo(-hw, hd); shp.closePath();
-                    } else {
-                        const a = w * 0.34, b = d * 0.42;
-                        shp.moveTo(-hw, -hd); shp.lineTo(hw, -hd); shp.lineTo(hw, hd - b);
-                        shp.lineTo(hw - a, hd - b); shp.lineTo(hw - a, hd); shp.lineTo(-hw + a, hd);
-                        shp.lineTo(-hw + a, hd - b); shp.lineTo(-hw, hd - b); shp.closePath();
-                    }
-                    mesh = makePrismWith(shp, shopH, mat, 0);
-                    mesh.position.set(x, localY - shopH / 2, z);
-                } else {
-                    mesh = new THREE.Mesh(new THREE.BoxGeometry(w, shopH, d), mat);
-                    mesh.position.set(x, localY, z);
+            // 店铺形状顶点（局部坐标，以原点为中心）：rect(L/T/U/cross/arc)
+            function shapePts(type, w, d) {
+                const hw = w / 2, hd = d / 2;
+                if (type === 'L') {
+                    const a = w * 0.42, b = d * 0.42;
+                    return [[-hw, -hd], [-hw + a, -hd], [-hw + a, hd - b], [hw, hd - b], [hw, hd], [-hw, hd]];
                 }
+                if (type === 'T') {
+                    const a = w * 0.34, b = d * 0.42;
+                    return [[-hw, -hd], [hw, -hd], [hw, hd - b], [hw - a, hd - b], [hw - a, hd], [-hw + a, hd], [-hw + a, hd - b], [-hw, hd - b]];
+                }
+                if (type === 'U') {
+                    const a = w * 0.32, b = d * 0.42;
+                    return [[-hw, -hd], [-hw, hd], [-hw + a, hd], [-hw + a, hd - b], [hw - a, hd - b], [hw - a, hd], [hw, hd], [hw, -hd]];
+                }
+                if (type === 'cross') {
+                    const a = w * 0.32, b = d * 0.32;
+                    return [[-a, -hd], [a, -hd], [a, -b], [hw, -b], [hw, b], [a, b], [a, hd], [-a, hd], [-a, b], [-hw, b], [-hw, -b], [-a, -b]];
+                }
+                if (type === 'arc') {
+                    const rOut = Math.min(hw, hd), rIn = rOut * 0.5, seg = 18;
+                    const start = -Math.PI * 0.7, end = Math.PI * 0.7;
+                    const pts = [];
+                    for (let i = 0; i <= seg; i++) { const t = start + (end - start) * i / seg; pts.push([Math.cos(t) * rOut, Math.sin(t) * rOut]); }
+                    for (let i = seg; i >= 0; i--) { const t = start + (end - start) * i / seg; pts.push([Math.cos(t) * rIn, Math.sin(t) * rIn]); }
+                    return pts;
+                }
+                return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]; // fallback: 矩形
+            }
+            // 生成店铺几何体；type: rect/circle/L/T/U/cross/arc；rot 弧度（绕垂直轴朝向）
+            function shopShapeGeo(type, w, d, shopH, mat, x, z, localY, rot) {
+                rot = (rot != null) ? rot : 0;
+                if (type === 'circle') {
+                    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, shopH, 30), mat);
+                    mesh.position.set(x, localY, z); mesh.rotation.y = rot; return mesh;
+                }
+                if (type === 'rect' || !type) {
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, shopH, d), mat);
+                    mesh.position.set(x, localY, z); mesh.rotation.y = rot; return mesh;
+                }
+                // 异形：把旋转烘焙进 Shape 顶点，再用 Extrude 旋转成型（圆角对齐旧矩形顶部）
+                const src = shapePts(type, w, d);
+                const cos = Math.cos(rot), sin = Math.sin(rot);
+                const rp = src.map(([px, py]) => [px * cos - py * sin, px * sin + py * cos]);
+                const shp = new THREE.Shape();
+                rp.forEach((p, i) => { if (i === 0) shp.moveTo(p[0], p[1]); else shp.lineTo(p[0], p[1]); });
+                shp.closePath();
+                const mesh = makePrismWith(shp, shopH, mat, 0);
+                mesh.position.set(x, localY - shopH / 2, z);
                 return mesh;
             }
 
@@ -2145,10 +2178,11 @@
                         let sx = (ov && ov.x != null) ? ov.x : cx, sz = (ov && ov.z != null) ? ov.z : cz;
                         let sw = (ov && ov.w != null) ? ov.w : cellW * 0.82, sd = (ov && ov.d != null) ? ov.d : cellD * 0.82;
                         const shape = (ov && ov.shape) || 'rect';
+                        const rot = (ov && ov.rot != null) ? ov.rot : 0;
                         const mat = new THREE.MeshStandardMaterial({ color: CAT_META[cat].color, transparent: true, opacity: 1, emissive: CAT_META[cat].color, emissiveIntensity: 0.12, metalness: 0.2, roughness: 0.6 });
                         const localY = -FH / 2 + 2 + shopH / 2;
-                        const mesh = shopShapeGeo(shape, sw, sd, shopH, mat, sx, sz, localY);
-                        const data = { id, name, cat, floor: f.display, desc, real: !!real, w: sw, d: sd, shape: shape };
+                        const mesh = shopShapeGeo(shape, sw, sd, shopH, mat, sx, sz, localY, rot);
+                        const data = { id, name, cat, floor: f.display, desc, real: !!real, w: sw, d: sd, shape: shape, rot: rot };
                         mesh.userData = { shop: data, id: id, kind: 'shop', floor: f.name };
                         group.add(mesh);
                         let label = null;
@@ -2168,10 +2202,10 @@
                 fc.customShops.forEach(cs => {
                     const meta = CAT_META[cs.cat];
                     const mat = new THREE.MeshStandardMaterial({ color: meta.color, transparent: true, opacity: 1, emissive: meta.color, emissiveIntensity: 0.12, metalness: 0.2, roughness: 0.6 });
-                    const w = cs.w || 12, d = cs.d || 12, shape = cs.shape || 'rect';
+                    const w = cs.w || 12, d = cs.d || 12, shape = cs.shape || 'rect', rot = cs.rot || 0;
                     const localY = -FH / 2 + 2 + shopH / 2;
-                    const mesh = shopShapeGeo(shape, w, d, shopH, mat, cs.x, cs.z, localY);
-                    const data = { id: cs.id, name: cs.name, cat: cs.cat, floor: f.display, desc: `${meta.label}区 · ${f.display} · 自定义新增`, real: false, w: w, d: d, shape: shape };
+                    const mesh = shopShapeGeo(shape, w, d, shopH, mat, cs.x, cs.z, localY, rot);
+                    const data = { id: cs.id, name: cs.name, cat: cs.cat, floor: f.display, desc: `${meta.label}区 · ${f.display} · 自定义新增`, real: false, w: w, d: d, shape: shape, rot: rot };
                     mesh.userData = { shop: data, id: cs.id, kind: 'shop', floor: f.name };
                     group.add(mesh);
                     let label = null;
@@ -2892,7 +2926,7 @@
             const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
             const bbox = fl ? fl.bbox : { minX: -indoorConfig.W / 2, maxX: indoorConfig.W / 2, minZ: -indoorConfig.D / 2, maxZ: indoorConfig.D / 2 };
             const id = 'c' + Date.now();
-            fe.customShops.push({ id, name: '新店铺', cat: 'shopping', x: 0, z: 0, w: 12, d: 12 });
+            fe.customShops.push({ id, name: '新店铺', cat: 'shopping', x: 0, z: 0, w: 12, d: 12, rot: 0 });
             updateStatus('已新增店铺：已切到「编辑店铺」模式，在 3D 中按住该店铺即可自由拖动到任意位置', 'success');
             rebuildIndoor();
             // 重建后自动进入编辑店铺模式，方便立即拖动新店（拖拽无需先选中，点中即拖）
@@ -2934,7 +2968,8 @@
             const x = entry ? entry.mesh.position.x : undefined;
             const z = entry ? entry.mesh.position.z : undefined;
             const prev = fe.shopOverrides[editSelShopId] || {};
-            fe.shopOverrides[editSelShopId] = Object.assign({}, prev, { cat: cat, name: name, x: x, z: z });
+            const rot = (entry && entry.data.rot != null) ? entry.data.rot : (prev.rot || 0);
+            fe.shopOverrides[editSelShopId] = Object.assign({}, prev, { cat: cat, name: name, x: x, z: z, rot: rot });
             updateStatus('已改为' + CAT_META[cat].label + '色', 'success');
             rebuildIndoor();
         }
@@ -2984,10 +3019,23 @@
             updateStatus('已调整店铺尺寸', 'success');
             rebuildIndoor();
         }
+        function onShopRotInput() {
+            const r = document.getElementById('shopRot'), vr = document.getElementById('valShopRot');
+            if (r && vr) vr.textContent = r.value;
+        }
+        function onShopRotChange() {
+            const r = document.getElementById('shopRot');
+            if (!r) return;
+            const rad = parseFloat(r.value) * Math.PI / 180;
+            const res = editSelectedShop((t) => { t.rot = rad; });
+            if (!res) return;
+            updateStatus('已调整店铺朝向', 'success');
+            rebuildIndoor();
+        }
         function syncSelectedShapeBtns(shape) {
             document.querySelectorAll('#shopShapeRow .cp-shape').forEach(b => b.classList.toggle('active', b.getAttribute('data-shape') === shape));
         }
-        // 选中店铺时把当前形状/尺寸回填到控件
+        // 选中店铺时把当前形状/尺寸/朝向回填到控件
         function updateSelectedShopControls() {
             if (!editSelShopId) return;
             const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
@@ -2996,10 +3044,11 @@
             const w = entry.data.w != null ? entry.data.w : 12;
             const d = entry.data.d != null ? entry.data.d : 12;
             const shape = entry.data.shape || 'rect';
-            const sw = document.getElementById('shopW'), sd = document.getElementById('shopD');
-            const vw = document.getElementById('valShopW'), vd = document.getElementById('valShopD');
-            if (sw) sw.value = w; if (sd) sd.value = d;
-            if (vw) vw.textContent = w; if (vd) vd.textContent = d;
+            const rotDeg = entry.data.rot != null ? Math.round(entry.data.rot * 180 / Math.PI) : 0;
+            const sw = document.getElementById('shopW'), sd = document.getElementById('shopD'), sr = document.getElementById('shopRot');
+            const vw = document.getElementById('valShopW'), vd = document.getElementById('valShopD'), vr = document.getElementById('valShopRot');
+            if (sw) sw.value = w; if (sd) sd.value = d; if (sr) sr.value = rotDeg;
+            if (vw) vw.textContent = w; if (vd) vd.textContent = d; if (vr) vr.textContent = rotDeg;
             syncSelectedShapeBtns(shape);
         }
         function undoLastWall() {
