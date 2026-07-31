@@ -2017,6 +2017,8 @@
 
             // ===== 逐层楼板 + 半透明外墙（按本层轮廓）+ 店铺/墙/设施 =====
             const useReal = !!(realIndoorShops && realIndoorShops.available);
+            // 一键清空标记：置位后不再生成默认/真实自动店铺网格，仅保留楼体壳与用户手动新增店铺
+            const cleared = !!(indoorEdit && indoorEdit.cleared);
             const floors = [];
 
             floorsData.forEach((f, fi) => {
@@ -2045,7 +2047,10 @@
                     group.add(re);
                 }
 
-                // —— 店铺网格（按轮廓裁剪，优先真实店铺，支持逐店覆盖/新增） ——
+                // —— 自动店铺网格（默认生成；一键清空后不再生成，仅保留楼体壳与用户手动新增店铺） ——
+                const shopH = FH * 0.62;
+                const shops = [];
+                if (!cleared) {
                 let cols = fc.COLS, rows = fc.ROWS;
                 if (useReal) {
                     let maxReal = 0;
@@ -2054,10 +2059,8 @@
                     if (isPoly) rows = Math.ceil(rows * 1.8);
                 }
                 const cellW = spanX / cols, cellD = spanZ / rows;
-                const shopH = FH * 0.62;
                 const aC0 = Math.floor(cols / 2) - 1, aC1 = Math.floor(cols / 2);
                 const aR0 = Math.floor(rows / 2) - 1, aR1 = Math.floor(rows / 2);
-                const shops = [];
                 const realList = useReal ? (realIndoorShops.byFloor[f.name] || []) : [];
                 let realIdx = 0;
                 for (let c = 0; c < cols; c++) {
@@ -2101,6 +2104,7 @@
                         shops.push({ mesh, label, data, world: new THREE.Vector3(sx, fi * FH + localY, sz) });
                     }
                 }
+                } // end if(!cleared)：已清空时跳过默认/真实自动店铺网格
                 // 用户新增店铺
                 fc.customShops.forEach(cs => {
                     const meta = CAT_META[cs.cat];
@@ -2871,7 +2875,8 @@
         // 一键清空商场内全部建模（店铺/内墙/设施/轮廓），便于从头设计
         function clearAllModeling() {
             if (!window.confirm('确定要清空商场内所有建模吗？\n将删除全部楼层的店铺、内墙、设施与轮廓，且不可撤销。')) return;
-            indoorEdit = { floors: {} };
+            // cleared 标记：清空后不再自动生成默认/真实店铺网格，只保留空楼体壳，真正从零设计
+            indoorEdit = { floors: {}, cleared: true };
             indoorConfig.footprint = null; // 整栋轮廓复位为矩形
             editSelShopId = null;
             editWallPts = []; editWallPtMarks = [];
