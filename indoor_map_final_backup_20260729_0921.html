@@ -615,6 +615,12 @@
             background: linear-gradient(135deg, #00d4ff, #0a84ff); color: #04121f;
         }
         .cp-generate:hover { transform: scale(1.03); box-shadow: 0 0 14px rgba(0, 212, 255, 0.5); }
+        .cp-size-block { margin-top: 10px; padding: 10px; border: 1px solid rgba(0, 212, 255, 0.28); border-radius: 10px; background: rgba(0, 212, 255, 0.04); }
+        .cp-sub2 { font-size: 12px; color: #9fe; margin: 2px 0 6px; font-weight: 600; }
+        .cp-shape-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+        .cp-shape { padding: 7px 2px; border: 1px solid rgba(0, 212, 255, 0.32); border-radius: 8px; cursor: pointer; background: rgba(255, 255, 255, 0.05); color: #dfe; font-size: 12px; transition: all 0.15s; }
+        .cp-shape:hover { background: rgba(0, 212, 255, 0.18); }
+        .cp-shape.active { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.45); box-shadow: 0 4px 14px rgba(0, 212, 255, 0.35); }
         .cp-divider { height: 1px; background: rgba(0, 212, 255, 0.25); margin: 16px 0 10px; }
         .cp-sub { font-size: 13px; color: #00d4ff; font-weight: 700; margin-bottom: 8px; }
         .cp-draw, .cp-draw-ok, .cp-draw-cancel {
@@ -936,6 +942,25 @@
                     <span class="sw" style="background:#f59e0b" onclick="recolorSelectedShop('dining')" title="餐饮"></span>
                     <span class="sw" style="background:#4ade80" onclick="recolorSelectedShop('entertainment')" title="娱乐"></span>
                     <span class="sw" style="background:#9ca3af" onclick="recolorSelectedShop('parking')" title="停车"></span>
+                </div>
+                <div class="cp-size-block">
+                    <div class="cp-sub2">店铺形状</div>
+                    <div class="cp-shape-row" id="shopShapeRow">
+                        <button class="cp-shape active" data-shape="rect" onclick="setShopShape('rect')">▭ 矩形</button>
+                        <button class="cp-shape" data-shape="circle" onclick="setShopShape('circle')">● 圆形</button>
+                        <button class="cp-shape" data-shape="L" onclick="setShopShape('L')">⌐ L形</button>
+                        <button class="cp-shape" data-shape="T" onclick="setShopShape('T')">⊤ T形</button>
+                    </div>
+                    <div class="cp-sub2">店铺尺寸（米）</div>
+                    <div class="cp-field">
+                        <label>宽度 <span id="valShopW">12</span></label>
+                        <input type="range" id="shopW" min="4" max="40" step="1" value="12" oninput="onShopSizeInput()" onchange="onShopSizeChange()">
+                    </div>
+                    <div class="cp-field">
+                        <label>进深 <span id="valShopD">12</span></label>
+                        <input type="range" id="shopD" min="4" max="40" step="1" value="12" oninput="onShopSizeInput()" onchange="onShopSizeChange()">
+                    </div>
+                    <div class="cp-hint" id="shopEditHint">先点选一个店铺（按住可拖动），再调整其形状与尺寸。</div>
                 </div>
                 <div class="cp-actions">
                     <button class="cp-mini" onclick="addShopHere()">➕ 新增</button>
@@ -2017,6 +2042,33 @@
                 m.position.y = yPos;
                 return m;
             }
+            // 按形状生成店铺网格：矩形=Box（中心在 localY）；圆形=Cylinder（中心在 localY）；L/T=ExtrudeGeometry（底面在 localY-shopH/2，顶在 localY+shopH/2，与矩形顶部对齐）
+            function shopShapeGeo(type, w, d, shopH, mat, x, z, localY) {
+                let mesh;
+                if (type === 'circle') {
+                    mesh = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, shopH, 30), mat);
+                    mesh.position.set(x, localY, z);
+                } else if (type === 'L' || type === 'T') {
+                    const hw = w / 2, hd = d / 2;
+                    const shp = new THREE.Shape();
+                    if (type === 'L') {
+                        const a = w * 0.42, b = d * 0.42;
+                        shp.moveTo(-hw, -hd); shp.lineTo(-hw + a, -hd); shp.lineTo(-hw + a, hd - b);
+                        shp.lineTo(hw, hd - b); shp.lineTo(hw, hd); shp.lineTo(-hw, hd); shp.closePath();
+                    } else {
+                        const a = w * 0.34, b = d * 0.42;
+                        shp.moveTo(-hw, -hd); shp.lineTo(hw, -hd); shp.lineTo(hw, hd - b);
+                        shp.lineTo(hw - a, hd - b); shp.lineTo(hw - a, hd); shp.lineTo(-hw + a, hd);
+                        shp.lineTo(-hw + a, hd - b); shp.lineTo(-hw, hd - b); shp.closePath();
+                    }
+                    mesh = makePrismWith(shp, shopH, mat, 0);
+                    mesh.position.set(x, localY - shopH / 2, z);
+                } else {
+                    mesh = new THREE.Mesh(new THREE.BoxGeometry(w, shopH, d), mat);
+                    mesh.position.set(x, localY, z);
+                }
+                return mesh;
+            }
 
             const slabGroundY = -FH / 2 + 1; // 楼板顶面（局部坐标）
             // 底座（整栋并集包围盒）
@@ -2092,11 +2144,11 @@
                         }
                         let sx = (ov && ov.x != null) ? ov.x : cx, sz = (ov && ov.z != null) ? ov.z : cz;
                         let sw = (ov && ov.w != null) ? ov.w : cellW * 0.82, sd = (ov && ov.d != null) ? ov.d : cellD * 0.82;
+                        const shape = (ov && ov.shape) || 'rect';
                         const mat = new THREE.MeshStandardMaterial({ color: CAT_META[cat].color, transparent: true, opacity: 1, emissive: CAT_META[cat].color, emissiveIntensity: 0.12, metalness: 0.2, roughness: 0.6 });
-                        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sw, shopH, sd), mat);
                         const localY = -FH / 2 + 2 + shopH / 2;
-                        mesh.position.set(sx, localY, sz);
-                        const data = { id, name, cat, floor: f.display, desc, real: !!real };
+                        const mesh = shopShapeGeo(shape, sw, sd, shopH, mat, sx, sz, localY);
+                        const data = { id, name, cat, floor: f.display, desc, real: !!real, w: sw, d: sd, shape: shape };
                         mesh.userData = { shop: data, id: id, kind: 'shop', floor: f.name };
                         group.add(mesh);
                         let label = null;
@@ -2116,10 +2168,10 @@
                 fc.customShops.forEach(cs => {
                     const meta = CAT_META[cs.cat];
                     const mat = new THREE.MeshStandardMaterial({ color: meta.color, transparent: true, opacity: 1, emissive: meta.color, emissiveIntensity: 0.12, metalness: 0.2, roughness: 0.6 });
-                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(cs.w || 12, shopH, cs.d || 12), mat);
+                    const w = cs.w || 12, d = cs.d || 12, shape = cs.shape || 'rect';
                     const localY = -FH / 2 + 2 + shopH / 2;
-                    mesh.position.set(cs.x, localY, cs.z);
-                    const data = { id: cs.id, name: cs.name, cat: cs.cat, floor: f.display, desc: `${meta.label}区 · ${f.display} · 自定义新增`, real: false };
+                    const mesh = shopShapeGeo(shape, w, d, shopH, mat, cs.x, cs.z, localY);
+                    const data = { id: cs.id, name: cs.name, cat: cs.cat, floor: f.display, desc: `${meta.label}区 · ${f.display} · 自定义新增`, real: false, w: w, d: d, shape: shape };
                     mesh.userData = { shop: data, id: cs.id, kind: 'shop', floor: f.name };
                     group.add(mesh);
                     let label = null;
@@ -2290,8 +2342,10 @@
                         const cs = (fe.customShops || []).find(s => s.id === id);
                         if (cs) { cs.x = entry.data.x; cs.z = entry.data.z; }
                     } else {
+                        // 网格店：合并写入，保留已有的形状/尺寸/颜色，避免拖动后异形被复位
                         fe.shopOverrides = fe.shopOverrides || {};
-                        fe.shopOverrides[id] = { x: entry.data.x, z: entry.data.z, cat: entry.data.cat, name: entry.data.name };
+                        const prev = fe.shopOverrides[id] || {};
+                        fe.shopOverrides[id] = Object.assign({}, prev, { x: entry.data.x, z: entry.data.z, cat: entry.data.cat, name: entry.data.name });
                     }
                 }
                 editDrag = null;
@@ -2368,7 +2422,8 @@
                 ct.textContent = cat.label; ct.style.background = cat.css + '33'; ct.style.color = cat.css;
                 document.getElementById('hudDetailFloor').textContent = s.floor;
                 document.getElementById('hudDetailDesc').textContent = s.desc;
-                if (editMode === 'shop') updateStatus('已选中「' + s.name + '」：按住拖动可移动，右侧可改色 / 删除 / 复位', 'success');
+                if (editMode === 'shop') updateStatus('已选中「' + s.name + '」：按住拖动可移动，右侧可改形状 / 尺寸 / 改色 / 删除', 'success');
+                updateSelectedShopControls();
             }
             function focusShop(s) {
                 const entry = floors[indoor.current].shops.find(x => x.data === s);
@@ -2560,9 +2615,9 @@
         function disposeIndoor() {
             if (indoor.animId) cancelAnimationFrame(indoor.animId);
             if (drawState) endDrawFootprint();
-            if (indoor._onMove && indoor.renderer) indoor.renderer.domElement.removeEventListener('mousemove', indoor._onMove);
-            if (indoor._onDown && indoor.renderer) indoor.renderer.domElement.removeEventListener('mousedown', indoor._onDown);
-            if (indoor._onUp && indoor.renderer) indoor.renderer.domElement.removeEventListener('mouseup', indoor._onUp);
+            if (indoor._onMove && indoor.renderer) indoor.renderer.domElement.removeEventListener('pointermove', indoor._onMove);
+            if (indoor._onDown && indoor.renderer) indoor.renderer.domElement.removeEventListener('pointerdown', indoor._onDown);
+            if (indoor._onUp && indoor.renderer) indoor.renderer.domElement.removeEventListener('pointerup', indoor._onUp);
             if (indoor._onResize) window.removeEventListener('resize', indoor._onResize);
             if (indoor.controls) indoor.controls.dispose();
             if (indoor.scene) {
@@ -2670,12 +2725,17 @@
             if (!indoor.active) return;
             const name = indoor.mallName || (currentBuildingInfo && currentBuildingInfo.name) || '商场';
             const keep = indoor.current || 0;
+            const selId = editSelShopId;   // 保存当前选中店铺，重建后恢复（避免调整形状/尺寸/颜色后丢失选中）
+            const em = editMode;           // 保存当前编辑模式，重建后恢复
             const ns = document.getElementById('hudNavSteps');
             if (ns) { ns.style.display = 'none'; ns.innerHTML = ''; }
             disposeIndoor();
             const ld = document.getElementById('indoorLoading');
             if (ld) ld.style.display = 'flex';
             buildIndoorScene(name);
+            editSelShopId = selId;
+            if (em) setEditMode(em);
+            if (selId) updateSelectedShopControls();
             if (keep > 0 && indoor.switchFloor) indoor.switchFloor(keep);
         }
 
@@ -2870,12 +2930,77 @@
             const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
             const entry = fl ? fl.shops.find(s => s.data.id === editSelShopId) : null;
             const name = entry ? entry.data.name : null;
-            // 保留当前位置，避免重建时坐标缺失导致店铺消失
+            // 保留当前位置与形状/尺寸，避免重建时坐标缺失或形状被复位
             const x = entry ? entry.mesh.position.x : undefined;
             const z = entry ? entry.mesh.position.z : undefined;
-            fe.shopOverrides[editSelShopId] = { cat: cat, name: name, x: x, z: z };
+            const prev = fe.shopOverrides[editSelShopId] || {};
+            fe.shopOverrides[editSelShopId] = Object.assign({}, prev, { cat: cat, name: name, x: x, z: z });
             updateStatus('已改为' + CAT_META[cat].label + '色', 'success');
             rebuildIndoor();
+        }
+        // ===== 店铺形状 / 尺寸编辑（选中店铺后生效） =====
+        // 统一写入入口：自定义店写 customShops，网格店写 shopOverrides（保留已有 x/z/cat/name/w/d/shape）
+        function editSelectedShop(fn) {
+            if (!editSelShopId) { updateStatus('请先点选一个店铺', 'error'); return null; }
+            const fe = floorEdit(curFloorName());
+            const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
+            const entry = fl ? fl.shops.find(s => s.data.id === editSelShopId) : null;
+            if (!entry) return null;
+            const x = entry.mesh.position.x, z = entry.mesh.position.z;
+            if (editSelShopId.charAt(0) === 'c') {
+                const cs = (fe.customShops || []).find(s => s.id === editSelShopId);
+                if (!cs) return null;
+                fn(cs, x, z);
+            } else {
+                fe.shopOverrides = fe.shopOverrides || {};
+                const ov = fe.shopOverrides[editSelShopId] || {};
+                ov.x = x; ov.z = z;
+                if (entry.data.cat) ov.cat = entry.data.cat;
+                if (entry.data.name) ov.name = entry.data.name;
+                fn(ov, x, z);
+                fe.shopOverrides[editSelShopId] = ov;
+            }
+            return entry;
+        }
+        function setShopShape(shape) {
+            const res = editSelectedShop((t) => { t.shape = shape; });
+            if (!res) return;
+            syncSelectedShapeBtns(shape);
+            updateStatus('已更改店铺形状', 'success');
+            rebuildIndoor();
+        }
+        function onShopSizeInput() {
+            const sw = document.getElementById('shopW'), sd = document.getElementById('shopD');
+            const vw = document.getElementById('valShopW'), vd = document.getElementById('valShopD');
+            if (sw && vw) vw.textContent = sw.value;
+            if (sd && vd) vd.textContent = sd.value;
+        }
+        function onShopSizeChange() {
+            const sw = document.getElementById('shopW'), sd = document.getElementById('shopD');
+            if (!sw || !sd) return;
+            const w = parseFloat(sw.value), d = parseFloat(sd.value);
+            const res = editSelectedShop((t) => { t.w = w; t.d = d; });
+            if (!res) return;
+            updateStatus('已调整店铺尺寸', 'success');
+            rebuildIndoor();
+        }
+        function syncSelectedShapeBtns(shape) {
+            document.querySelectorAll('#shopShapeRow .cp-shape').forEach(b => b.classList.toggle('active', b.getAttribute('data-shape') === shape));
+        }
+        // 选中店铺时把当前形状/尺寸回填到控件
+        function updateSelectedShopControls() {
+            if (!editSelShopId) return;
+            const fl = (indoor.floors && indoor.floors[indoor.current]) ? indoor.floors[indoor.current] : null;
+            const entry = fl ? fl.shops.find(s => s.data.id === editSelShopId) : null;
+            if (!entry) return;
+            const w = entry.data.w != null ? entry.data.w : 12;
+            const d = entry.data.d != null ? entry.data.d : 12;
+            const shape = entry.data.shape || 'rect';
+            const sw = document.getElementById('shopW'), sd = document.getElementById('shopD');
+            const vw = document.getElementById('valShopW'), vd = document.getElementById('valShopD');
+            if (sw) sw.value = w; if (sd) sd.value = d;
+            if (vw) vw.textContent = w; if (vd) vd.textContent = d;
+            syncSelectedShapeBtns(shape);
         }
         function undoLastWall() {
             const fe = floorEdit(curFloorName());
