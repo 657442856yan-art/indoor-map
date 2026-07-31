@@ -2927,10 +2927,12 @@
             const bbox = fl ? fl.bbox : { minX: -indoorConfig.W / 2, maxX: indoorConfig.W / 2, minZ: -indoorConfig.D / 2, maxZ: indoorConfig.D / 2 };
             const id = 'c' + Date.now();
             fe.customShops.push({ id, name: '新店铺', cat: 'shopping', x: 0, z: 0, w: 12, d: 12, rot: 0 });
-            updateStatus('已新增店铺：已切到「编辑店铺」模式，在 3D 中按住该店铺即可自由拖动到任意位置', 'success');
             rebuildIndoor();
-            // 重建后自动进入编辑店铺模式，方便立即拖动新店（拖拽无需先选中，点中即拖）
+            // 重建后自动进入编辑店铺模式，并自动选中新店，使形状/尺寸/旋转按钮立即可用（改形状无需先在 3D 中点选）
             setEditMode('shop');
+            editSelShopId = id;
+            updateSelectedShopControls();
+            updateStatus('已新增并选中店铺：右侧可切换形状 / 调尺寸 / 调朝向，在 3D 中按住该店可拖动', 'success');
         }
         function deleteSelectedShop() {
             if (!editSelShopId) { updateStatus('请先点选一个店铺', 'error'); return; }
