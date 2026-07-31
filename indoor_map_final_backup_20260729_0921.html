@@ -603,6 +603,12 @@
         .cp-apply { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; }
         .cp-reset { background: rgba(255, 255, 255, 0.1); color: #cfe; }
         .cp-apply:hover, .cp-reset:hover { transform: scale(1.03); }
+        .cp-clear {
+            flex: 1; padding: 11px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 700; transition: all 0.2s;
+            background: linear-gradient(135deg, #ff4d4f, #b91c1c); color: #fff;
+        }
+        .cp-clear:hover { transform: scale(1.03); box-shadow: 0 0 14px rgba(255, 77, 79, 0.5); }
         .cp-divider { height: 1px; background: rgba(0, 212, 255, 0.25); margin: 16px 0 10px; }
         .cp-sub { font-size: 13px; color: #00d4ff; font-weight: 700; margin-bottom: 8px; }
         .cp-draw, .cp-draw-ok, .cp-draw-cancel {
@@ -905,6 +911,9 @@
             <div class="cp-actions">
                 <button class="cp-apply" onclick="applyCustomConfig()">应用并重建</button>
                 <button class="cp-reset" onclick="resetCustomConfig()">重置默认</button>
+            </div>
+            <div class="cp-actions">
+                <button class="cp-clear" onclick="clearAllModeling()">🧹 一键清空建模</button>
             </div>
             <div class="cp-divider"></div>
             <div class="cp-sub">编辑工具 <span class="cp-floor">当前层：<b id="cpEditFloor">F1</b></span></div>
@@ -2857,6 +2866,19 @@
             const fe = floorEdit(curFloorName());
             fe.walls = [];
             updateStatus('已清空本层内墙', 'success');
+            rebuildIndoor();
+        }
+        // 一键清空商场内全部建模（店铺/内墙/设施/轮廓），便于从头设计
+        function clearAllModeling() {
+            if (!window.confirm('确定要清空商场内所有建模吗？\n将删除全部楼层的店铺、内墙、设施与轮廓，且不可撤销。')) return;
+            indoorEdit = { floors: {} };
+            indoorConfig.footprint = null; // 整栋轮廓复位为矩形
+            editSelShopId = null;
+            editWallPts = []; editWallPtMarks = [];
+            if (drawState) endDrawFootprint();
+            syncCustomPanel();
+            updateStatus('已清空全部建模，可重新设计', 'success');
+            markQS('size');
             rebuildIndoor();
         }
 
