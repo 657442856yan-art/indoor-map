@@ -5,43 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>室内地图 · 最终版</title>
     <style>
+        :root{
+            --bg:#f3f4f6; --panel:#ffffff; --panel-2:#fafbfc;
+            --border:#e4e7ec; --border-strong:#d4d9e0;
+            --text:#1f2329; --text-2:#5b626b; --text-3:#8a9099;
+            --accent:#2b6cff; --accent-d:#1f56e0; --accent-weak:#eaf1ff;
+            --ok:#16a34a; --err:#dc2626; --warn:#d97706;
+            --shadow:0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.04);
+            --radius:8px;
+            --hud-bg:rgba(31,35,43,.95); --hud-border:rgba(255,255,255,.12);
+            --hud-text:#e9ebef; --hud-text-2:#aab1bd; --hud-accent:#4c8dff;
+            --hud-shadow:0 4px 16px rgba(0,0,0,.28);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: var(--bg);
             min-height: 100vh;
-            color: #fff;
+            color: var(--text);
         }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
         .header {
             text-align: center;
             margin-bottom: 20px;
-            padding: 20px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
+            padding: 18px 20px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
         }
-        .header h1 { font-size: 28px; margin-bottom: 10px; background: linear-gradient(90deg, #00d4ff, #7b2cbf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .header p { color: #888; font-size: 14px; }
-        
+        .header h1 { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: .5px; }
+        .header p { color: var(--text-2); font-size: 13px; margin-top: 6px; }
+
         .main-layout { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
-        
+
         .sidebar {
-            background: rgba(255,255,255,0.05);
-            border-radius: 16px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px;
+            box-shadow: var(--shadow);
             height: fit-content;
             max-height: calc(100vh - 200px);
             overflow-y: auto;
         }
-        .sidebar h3 { font-size: 16px; margin-bottom: 15px; color: #00d4ff; }
-        
+        .sidebar h3 { font-size: 15px; margin-bottom: 14px; color: var(--text); font-weight: 600; }
+
         /* 搜索区域 */
         .search-section {
             margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 18px;
+            border-bottom: 1px solid var(--border);
         }
         .search-box {
             display: flex;
@@ -50,35 +64,35 @@
         }
         .search-input {
             flex: 1;
-            padding: 12px 15px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 8px;
-            color: #fff;
+            padding: 10px 14px;
+            background: var(--panel-2);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            color: var(--text);
             font-size: 14px;
             outline: none;
         }
-        .search-input::placeholder { color: #888; }
-        .search-input:focus { border-color: #00d4ff; }
+        .search-input::placeholder { color: var(--text-3); }
+        .search-input:focus { border-color: var(--accent); }
         .search-btn {
-            padding: 12px 20px;
-            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
-            border: none;
-            border-radius: 8px;
+            padding: 10px 18px;
+            background: var(--accent);
+            border: 1px solid var(--accent-d);
+            border-radius: var(--radius);
             color: #fff;
             font-size: 14px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: background .15s;
         }
-        .search-btn:hover { transform: scale(1.05); }
-        .search-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        
+        .search-btn:hover { background: var(--accent-d); }
+        .search-btn:disabled { opacity: .5; cursor: not-allowed; }
+
         .search-tips {
             font-size: 12px;
-            color: #888;
-            line-height: 1.5;
+            color: var(--text-2);
+            line-height: 1.6;
         }
-        
+
         /* 搜索结果 */
         .search-results {
             margin-top: 15px;
@@ -86,59 +100,63 @@
             overflow-y: auto;
         }
         .result-item {
-            padding: 12px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
+            padding: 11px 12px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             margin-bottom: 8px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: border-color .15s, background .15s;
             border-left: 3px solid transparent;
         }
         .result-item:hover {
-            background: rgba(255,255,255,0.1);
-            border-left-color: #00d4ff;
+            background: #fff;
+            border-left-color: var(--accent);
         }
-        .result-item h4 { font-size: 14px; margin-bottom: 4px; color: #fff; }
-        .result-item p { font-size: 12px; color: #888; }
-        .result-item .address { color: #aaa; margin-top: 4px; }
+        .result-item h4 { font-size: 14px; margin-bottom: 4px; color: var(--text); }
+        .result-item p { font-size: 12px; color: var(--text-2); }
+        .result-item .address { color: var(--text-2); margin-top: 4px; }
         .result-item .has-indoor {
             display: inline-block;
             padding: 2px 8px;
-            background: rgba(74, 222, 128, 0.2);
-            color: #4ade80;
+            background: rgba(22,163,74,.1);
+            color: var(--ok);
             font-size: 11px;
             border-radius: 4px;
             margin-top: 6px;
         }
-        
+
         .no-results {
             text-align: center;
             padding: 20px;
-            color: #888;
+            color: var(--text-2);
             font-size: 13px;
         }
-        
+
         /* 楼层选择器 */
         .floor-section {
-            margin: 20px 0;
-            padding: 15px;
-            background: rgba(0, 212, 255, 0.1);
-            border-radius: 12px;
-            border: 1px solid rgba(0, 212, 255, 0.3);
+            margin: 18px 0;
+            padding: 14px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
         }
         .floor-section h3 {
-            color: #00d4ff;
+            color: var(--text);
             margin-bottom: 12px;
             display: flex;
             align-items: center;
             gap: 8px;
+            font-size: 15px;
+            font-weight: 600;
         }
         .floor-info {
             font-size: 12px;
-            color: #888;
+            color: var(--text-2);
             margin-bottom: 12px;
-            padding: 8px;
-            background: rgba(0,0,0,0.2);
+            padding: 8px 10px;
+            background: #fff;
+            border: 1px solid var(--border);
             border-radius: 6px;
         }
         .floor-list {
@@ -152,129 +170,135 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 12px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
+            padding: 9px 12px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             cursor: pointer;
-            transition: all 0.3s;
-            border: 1px solid transparent;
+            transition: border-color .15s, background .15s;
         }
         .floor-item:hover {
-            background: rgba(255,255,255,0.1);
-            border-color: rgba(0, 212, 255, 0.5);
+            background: #fff;
+            border-color: var(--accent);
         }
         .floor-item.active {
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(123, 44, 191, 0.3));
-            border-color: #00d4ff;
+            background: var(--accent-weak);
+            border-color: var(--accent);
         }
         .floor-name {
             font-size: 14px;
             font-weight: 500;
+            color: var(--text);
         }
         .floor-type {
             font-size: 11px;
             padding: 2px 8px;
-            background: rgba(255,255,255,0.1);
+            background: #eef0f3;
             border-radius: 4px;
-            color: #aaa;
+            color: var(--text-2);
         }
-        .floor-type.entertainment { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
-        .floor-type.dining { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-        .floor-type.shopping { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
-        .floor-type.parking { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
-        
+        .floor-type.entertainment { background: rgba(190, 24, 93, .1); color: #be185d; }
+        .floor-type.dining { background: rgba(180, 83, 9, .1); color: #b45309; }
+        .floor-type.shopping { background: rgba(30, 64, 175, .1); color: #1e40af; }
+        .floor-type.parking { background: rgba(75, 85, 99, .12); color: #475569; }
+
         .floor-legend {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             margin-top: 12px;
             padding-top: 12px;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid var(--border);
         }
         .legend-item {
             display: flex;
             align-items: center;
             gap: 4px;
             font-size: 11px;
-            color: #888;
+            color: var(--text-2);
         }
         .legend-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
         }
-        
-        /* 预设商场 */
+
+        /* 预设建筑 */
         .preset-section {
             margin-top: 20px;
         }
         .section-title {
-            font-size: 14px;
-            color: #888;
+            font-size: 13px;
+            color: var(--text-2);
             margin-bottom: 12px;
             display: flex;
             align-items: center;
             gap: 8px;
+            font-weight: 600;
         }
-        
+
         .building-list { display: flex; flex-direction: column; gap: 10px; }
         .building-item {
-            padding: 15px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
+            padding: 13px 14px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             cursor: pointer;
-            transition: all 0.3s;
-            border: 2px solid transparent;
+            transition: border-color .15s, background .15s;
         }
-        .building-item:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); }
-        .building-item.active { border-color: #00d4ff; background: rgba(0,212,255,0.1); }
-        .building-item h4 { font-size: 14px; margin-bottom: 5px; }
-        .building-item p { font-size: 12px; color: #888; }
-        
+        .building-item:hover { background: #fff; border-color: var(--accent); }
+        .building-item.active { border-color: var(--accent); background: var(--accent-weak); }
+        .building-item h4 { font-size: 14px; margin-bottom: 5px; color: var(--text); }
+        .building-item p { font-size: 12px; color: var(--text-2); }
+
         .map-container {
-            background: rgba(255,255,255,0.05);
-            border-radius: 16px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px;
+            box-shadow: var(--shadow);
             position: relative;
         }
         #map {
             width: 100%;
             height: 600px;
-            border-radius: 12px;
-            background: #f0f0f0;
+            border-radius: var(--radius);
+            background: #e9ecef;
+            border: 1px solid var(--border);
         }
-        
+
         .status-bar {
             margin-top: 15px;
-            padding: 12px 15px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 8px;
+            padding: 11px 14px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             font-size: 13px;
             display: flex;
             align-items: center;
             gap: 10px;
+            color: var(--text);
         }
-        .status-bar.success { border-left: 3px solid #4ade80; }
-        .status-bar.error { border-left: 3px solid #f87171; }
-        .status-bar.loading { border-left: 3px solid #fbbf24; }
-        
+        .status-bar.success { border-left: 3px solid var(--ok); }
+        .status-bar.error { border-left: 3px solid var(--err); }
+        .status-bar.loading { border-left: 3px solid var(--warn); }
+
         /* 地图上的楼层控制器 */
         .map-floor-control {
             position: absolute;
             right: 30px;
             top: 50%;
             transform: translateY(-50%);
-            background: rgba(0,0,0,0.85);
-            border-radius: 12px;
-            padding: 10px;
+            background: var(--hud-bg);
+            border-radius: var(--radius);
+            padding: 8px;
             display: none;
             flex-direction: column;
             gap: 4px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--hud-border);
             max-height: 400px;
             overflow-y: auto;
+            box-shadow: var(--hud-shadow);
         }
         .map-floor-control.visible { display: flex; }
         .map-floor-btn {
@@ -282,24 +306,21 @@
             align-items: center;
             justify-content: center;
             min-width: 50px;
-            padding: 10px 15px;
-            background: rgba(255,255,255,0.1);
+            padding: 9px 14px;
+            background: rgba(255,255,255,.08);
             border: 1px solid transparent;
             color: #fff;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
-            transition: all 0.2s;
+            transition: background .15s;
         }
-        .map-floor-btn:hover {
-            background: rgba(255,255,255,0.2);
-            transform: scale(1.05);
-        }
+        .map-floor-btn:hover { background: rgba(255,255,255,.18); }
         .map-floor-btn.active {
-            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
-            border-color: rgba(255,255,255,0.3);
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+            background: var(--hud-accent);
+            border-color: rgba(255,255,255,.25);
+            color: #fff;
         }
 
         /* 点击地图建筑进入 3D 的提示条 */
@@ -312,22 +333,20 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 10px 14px;
-            background: rgba(11, 15, 30, 0.85);
-            border: 1px solid rgba(0, 212, 255, 0.35);
-            border-radius: 10px;
-            color: #dff;
+            padding: 9px 13px;
+            background: var(--hud-bg);
+            border: 1px solid var(--hud-border);
+            border-radius: var(--radius);
+            color: var(--hud-text);
             font-size: 12.5px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-            animation: hintPulse 2.4s ease-in-out infinite;
+            box-shadow: var(--hud-shadow);
         }
-        .map-hint strong { color: #00d4ff; }
+        .map-hint strong { color: var(--hud-accent); }
         .map-hint-close {
             margin-left: 2px;
             background: transparent;
             border: none;
-            color: #9ab;
+            color: var(--hud-text-2);
             font-size: 16px;
             line-height: 1;
             cursor: pointer;
@@ -335,68 +354,63 @@
         }
         .map-hint-close:hover { color: #fff; }
         .map-hint.hide { display: none; }
-        @keyframes hintPulse {
-            0%, 100% { border-color: rgba(0, 212, 255, 0.35); }
-            50% { border-color: rgba(0, 212, 255, 0.85); }
-        }
 
-        /* 预设商场可点击标记 */
+        /* 预设建筑可点击标记 */
         .mall-marker {
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            background: rgba(0, 212, 255, 0.18);
-            border: 2px solid #00d4ff;
+            font-size: 16px;
+            background: rgba(43, 108, 255, .15);
+            border: 2px solid var(--accent);
             border-radius: 50% 50% 50% 0;
             transform: rotate(-45deg);
-            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.45);
             cursor: pointer;
         }
         .mall-marker > span { transform: rotate(45deg); }
 
         .demo-mode {
             margin-top: 15px;
-            padding: 15px;
-            background: rgba(251, 191, 36, 0.1);
-            border-radius: 8px;
-            border: 1px solid rgba(251, 191, 36, 0.3);
+            padding: 13px;
+            background: var(--panel-2);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
         }
-        .demo-mode h4 { color: #fbbf24; font-size: 14px; margin-bottom: 10px; }
-        .demo-mode p { font-size: 12px; color: #ccc; line-height: 1.6; }
-        
+        .demo-mode h4 { color: var(--warn); font-size: 13px; margin-bottom: 8px; }
+        .demo-mode p { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+
         /* 加载动画 */
         .loading-spinner {
             display: inline-block;
             width: 16px;
             height: 16px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: #00d4ff;
+            border: 2px solid rgba(0,0,0,.15);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        
+
         /* 建筑信息面板 */
         .building-info {
             margin-bottom: 15px;
-            padding: 12px;
-            background: rgba(74, 222, 128, 0.1);
-            border-radius: 8px;
-            border-left: 3px solid #4ade80;
+            padding: 11px 12px;
+            background: rgba(22,163,74,.08);
+            border-radius: var(--radius);
+            border-left: 3px solid var(--ok);
         }
         .building-info h4 {
-            color: #4ade80;
-            font-size: 14px;
+            color: var(--ok);
+            font-size: 13px;
             margin-bottom: 4px;
         }
         .building-info p {
             font-size: 12px;
-            color: #aaa;
+            color: var(--text-2);
         }
-        
+
         @media (max-width: 900px) {
             .main-layout { grid-template-columns: 1fr; }
             #map { height: 400px; }
@@ -413,39 +427,39 @@
             display: inline-block;
             margin-top: 10px;
             padding: 4px 14px;
-            border-radius: 20px;
-            background: rgba(0, 212, 255, 0.12);
-            border: 1px solid rgba(0, 212, 255, 0.35);
+            border-radius: 14px;
+            background: var(--accent-weak);
+            border: 1px solid rgba(43,108,255,.3);
             font-size: 13px;
-            color: #00d4ff;
+            color: var(--accent-d);
         }
 
-        /* ===== 进入商场按钮 ===== */
+        /* ===== 进入按钮 ===== */
         .enter-mall-btn {
             margin-top: 12px;
             width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #7b2cbf, #00d4ff);
-            border: none;
-            border-radius: 10px;
+            padding: 11px;
+            background: var(--accent);
+            border: 1px solid var(--accent-d);
+            border-radius: var(--radius);
             color: #fff;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: background .15s;
         }
-        .enter-mall-btn:hover { transform: scale(1.03); box-shadow: 0 4px 18px rgba(123, 44, 191, 0.5); }
-        .enter-mall-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .enter-mall-btn:hover { background: var(--accent-d); }
+        .enter-mall-btn:disabled { opacity: .5; cursor: not-allowed; }
 
         /* ===== 室内 3D 模式叠加层 ===== */
         #indoorOverlay {
             position: fixed;
             inset: 0;
             z-index: 9999;
-            background: radial-gradient(circle at 50% 38%, #16213e 0%, #0b0b18 100%);
+            background: #0f1115;
             display: none;
             opacity: 0;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.4s ease;
             overflow: hidden;
         }
         #indoorOverlay.active { display: block; }
@@ -453,65 +467,68 @@
         #indoorCanvas { position: absolute; inset: 0; display: block; }
 
         /* HUD 通用：容器不挡事件，子元素可交互 */
-        .hud { position: absolute; z-index: 10; color: #e6f6ff; pointer-events: none; }
+        .hud { position: absolute; z-index: 10; color: var(--hud-text); pointer-events: none; }
         .hud * { pointer-events: auto; }
 
         /* 顶部栏 */
         .hud-top {
-            top: 0; left: 0; right: 0; height: 58px;
+            top: 0; left: 0; right: 0; height: 56px;
             display: flex; align-items: center; justify-content: space-between;
             padding: 0 18px;
-            background: linear-gradient(180deg, rgba(11, 11, 24, 0.92), rgba(11, 11, 24, 0));
+            background: rgba(15,17,21,.92);
+            border-bottom: 1px solid var(--hud-border);
         }
-        .hud-top .mall-title { font-size: 18px; font-weight: 700; line-height: 1.2; }
-        .hud-top .mall-title small { display: block; font-size: 11px; color: #8ab; font-weight: 400; }
+        .hud-top .mall-title { font-size: 17px; font-weight: 700; line-height: 1.2; color: #fff; }
+        .hud-top .mall-title small { display: block; font-size: 11px; color: var(--hud-text-2); font-weight: 400; }
         .hud-top .top-right { display: flex; align-items: center; gap: 12px; }
         .mode-badge {
-            padding: 4px 12px; border-radius: 20px;
-            background: rgba(0, 212, 255, 0.15); border: 1px solid rgba(0, 212, 255, 0.4);
-            font-size: 13px;
+            padding: 4px 12px; border-radius: 14px;
+            background: rgba(76,141,255,.16); border: 1px solid rgba(76,141,255,.4);
+            font-size: 13px; color: var(--hud-accent);
         }
         .return-btn {
-            padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer;
-            background: linear-gradient(135deg, #ff5f6d, #ffc371); color: #fff;
-            font-weight: 600; font-size: 13px; transition: all 0.2s;
+            padding: 7px 14px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer;
+            background: transparent; color: var(--hud-text);
+            font-weight: 500; font-size: 13px; transition: background .15s;
         }
-        .return-btn:hover { transform: scale(1.05); }
+        .return-btn:hover { background: rgba(255,255,255,.1); }
 
         /* 右侧楼层控制器 */
         .hud-right {
-            right: 18px; top: 50%; transform: translateY(-50%);
+            right: 18px; top: 72px;
             display: flex; flex-direction: column; gap: 6px;
-            background: rgba(11, 11, 24, 0.55); backdrop-filter: blur(8px);
-            padding: 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
-            max-height: 72vh; overflow-y: auto;
+            background: var(--hud-bg);
+            padding: 9px; border-radius: var(--radius); border: 1px solid var(--hud-border);
+            max-height: 40vh; overflow-y: auto;
+            box-shadow: var(--hud-shadow);
         }
         .hud-floor-btn {
-            min-width: 54px; padding: 10px 8px; border-radius: 8px; border: 1px solid transparent;
-            background: rgba(255, 255, 255, 0.08); color: #fff; cursor: pointer;
-            font-size: 13px; font-weight: 500; transition: all 0.2s;
+            min-width: 54px; padding: 9px 8px; border-radius: 6px; border: 1px solid transparent;
+            background: rgba(255, 255, 255, .07); color: #fff; cursor: pointer;
+            font-size: 13px; font-weight: 500; transition: background .15s;
         }
-        .hud-floor-btn:hover { background: rgba(255, 255, 255, 0.18); }
+        .hud-floor-btn:hover { background: rgba(255, 255, 255, .16); }
         .hud-floor-btn.active {
-            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
-            border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 4px 14px rgba(0, 212, 255, 0.4);
+            background: var(--hud-accent);
+            border-color: rgba(255, 255, 255, .25);
         }
 
         /* 左侧店铺列表 */
         .hud-left {
-            left: 18px; top: 74px; width: 232px; max-height: calc(100vh - 150px);
-            background: rgba(11, 11, 24, 0.6); backdrop-filter: blur(8px);
-            border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+            left: 18px; top: 72px; width: 232px; max-height: calc(100vh - 210px);
+            background: var(--hud-bg);
+            border-radius: var(--radius); border: 1px solid var(--hud-border);
             padding: 12px; overflow-y: auto;
+            box-shadow: var(--hud-shadow);
         }
-        .hud-left h4 { font-size: 13px; color: #00d4ff; margin-bottom: 8px; }
+        .hud-left h4 { font-size: 13px; color: var(--hud-accent); margin-bottom: 8px; }
         .shop-list-item {
             display: flex; align-items: center; gap: 8px; padding: 8px;
-            border-radius: 8px; cursor: pointer; font-size: 12px;
-            transition: all 0.2s; border: 1px solid transparent;
+            border-radius: 6px; cursor: pointer; font-size: 12px;
+            transition: background .15s; border: 1px solid transparent;
         }
-        .shop-list-item:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(0, 212, 255, 0.4); }
-        .shop-list-item.active { background: rgba(0, 212, 255, 0.15); border-color: #00d4ff; }
+        .shop-list-item:hover { background: rgba(255, 255, 255, .08); border-color: rgba(76,141,255,.4); }
+        .shop-list-item.active { background: rgba(76,141,255,.16); border-color: var(--hud-accent); }
         .shop-cat-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 
         /* 底部提示 + 选中详情 */
@@ -521,28 +538,34 @@
             width: min(680px, 92vw);
         }
         .hud-hint {
-            font-size: 12px; color: #9fb; background: rgba(11, 11, 24, 0.6);
-            padding: 6px 14px; border-radius: 20px; text-align: center;
+            font-size: 12px; color: var(--hud-text-2); background: var(--hud-bg);
+            padding: 6px 14px; border-radius: 14px; text-align: center;
+            border: 1px solid var(--hud-border);
+        }
+        .hud-locate {
+            left: 16px; bottom: 16px; width: min(280px, 86vw);
+            display: flex; flex-direction: column; align-items: stretch; gap: 8px;
         }
         .hud-detail {
-            width: 100%; background: rgba(11, 11, 24, 0.82); backdrop-filter: blur(8px);
-            border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 12px;
+            width: 100%; background: var(--hud-bg);
+            border: 1px solid var(--hud-border); border-radius: var(--radius);
             padding: 12px 16px; display: none;
+            box-shadow: var(--hud-shadow);
         }
         .hud-detail.show { display: block; }
-        .hud-detail h3 { font-size: 15px; margin-bottom: 4px; }
+        .hud-detail h3 { font-size: 15px; margin-bottom: 4px; color: #fff; }
         .hud-detail .cat-tag {
             display: inline-block; padding: 2px 8px; border-radius: 4px;
             font-size: 11px; margin-right: 6px;
         }
-        .hud-detail p { font-size: 12px; color: #aab; margin-top: 6px; }
+        .hud-detail p { font-size: 12px; color: var(--hud-text-2); margin-top: 6px; }
 
         /* 悬停浮层 */
         .hud-tooltip {
             position: absolute; z-index: 30; pointer-events: none;
-            background: rgba(11, 11, 24, 0.92); border: 1px solid rgba(0, 212, 255, 0.5);
-            border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #e6f6ff;
-            display: none; max-width: 230px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+            background: var(--hud-bg); border: 1px solid var(--hud-border);
+            border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--hud-text);
+            display: none; max-width: 230px; box-shadow: var(--hud-shadow);
         }
         .hud-tooltip .t-name { font-weight: 700; font-size: 13px; }
         .hud-tooltip .t-cat { margin-top: 3px; }
@@ -550,7 +573,7 @@
         /* 3D 加载中 */
         .indoor-loading {
             position: absolute; inset: 0; display: flex; align-items: center;
-            justify-content: center; color: #00d4ff; font-size: 14px; gap: 10px; z-index: 5;
+            justify-content: center; color: var(--hud-accent); font-size: 14px; gap: 10px; z-index: 5;
         }
 
         /* 室内模式：隐藏原界面 */
@@ -559,221 +582,262 @@
         body.indoor-mode .header { display: none; }
 
         @media (max-width: 720px) {
-            .hud-left { width: 152px; top: 66px; padding: 8px; }
+            .hud-left { width: 152px; top: 64px; padding: 8px; }
             .hud-right { padding: 6px; }
             .hud-floor-btn { min-width: 42px; padding: 8px 4px; font-size: 11px; }
             .hud-bottom { width: 94vw; }
+            .hud-locate { left: 8px; bottom: 8px; width: min(46vw, 220px); }
+            .hud-navbox { right: 8px; bottom: 8px; width: min(46vw, 220px); }
             .hud-top .mall-title { font-size: 15px; }
         }
 
         /* 顶部 HUD 通用按钮（自定义 / 等） */
         .hud-btn {
-            padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer;
-            background: rgba(0, 212, 255, 0.15); border: 1px solid rgba(0, 212, 255, 0.45);
-            color: #e6f6ff; font-size: 13px; font-weight: 600; transition: all 0.2s;
+            padding: 7px 14px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer;
+            background: rgba(255,255,255,.08); color: var(--hud-text); font-size: 13px; font-weight: 500;
+            transition: background .15s;
         }
-        .hud-btn:hover { background: rgba(0, 212, 255, 0.3); transform: scale(1.04); }
+        .hud-btn:hover { background: rgba(255,255,255,.16); }
 
         /* 自定义建模面板（左侧抽屉） */
         .hud-custom {
             left: 0; top: 0; bottom: 0; width: 320px; max-width: 86vw;
-            background: rgba(9, 12, 26, 0.96); backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(0, 212, 255, 0.3);
+            background: #1b1f27;
+            border-right: 1px solid var(--hud-border);
             padding: 16px 18px; overflow-y: auto; z-index: 40;
             pointer-events: auto;
-            transform: translateX(-110%); transition: transform 0.35s ease;
+            transform: translateX(-110%); transition: transform 0.3s ease;
         }
         .hud-custom.open { transform: translateX(0); }
         .cp-head {
             display: flex; align-items: center; justify-content: space-between;
-            font-size: 15px; font-weight: 700; color: #00d4ff; margin-bottom: 14px;
+            font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 14px;
         }
-        .cp-close { background: none; border: none; color: #9ab; font-size: 18px; cursor: pointer; }
+        .cp-close { background: none; border: none; color: var(--hud-text-2); font-size: 18px; cursor: pointer; }
+        .cp-close:hover { color: #fff; }
         .cp-field { margin-bottom: 14px; }
-        .cp-field label { display: flex; justify-content: space-between; font-size: 12px; color: #cfe; margin-bottom: 6px; }
-        .cp-field label span { color: #00d4ff; font-weight: 600; }
-        .cp-field input[type="range"] { width: 100%; accent-color: #00d4ff; }
-        .cp-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #cfe; margin-bottom: 10px; cursor: pointer; }
-        .cp-check input { accent-color: #00d4ff; width: 16px; height: 16px; }
+        .cp-field label { display: flex; justify-content: space-between; font-size: 12px; color: var(--hud-text); margin-bottom: 6px; }
+        .cp-field label span { color: var(--hud-accent); font-weight: 600; }
+        .cp-field input[type="range"] { width: 100%; accent-color: var(--hud-accent); }
+        .cp-floor-count { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+        .cp-floor-count label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--hud-text); margin: 0; }
+        .cp-floor-count input[type="number"] {
+            width: 76px; padding: 7px 8px; border-radius: 6px;
+            border: 1px solid var(--hud-border); background: rgba(255,255,255,.06);
+            color: #fff; font-size: 14px; font-weight: 600; text-align: center;
+        }
+        .cp-floor-count input[type="number"]:focus { outline: none; border-color: var(--hud-accent); }
+        .cp-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--hud-text); margin-bottom: 10px; cursor: pointer; }
+        .cp-check input { accent-color: var(--hud-accent); width: 16px; height: 16px; }
         .cp-actions { display: flex; gap: 10px; margin-top: 8px; }
         .cp-apply, .cp-reset {
-            flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer;
-            font-size: 13px; font-weight: 600; transition: all 0.2s;
+            flex: 1; padding: 10px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 600; transition: background .15s;
         }
-        .cp-apply { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; }
-        .cp-reset { background: rgba(255, 255, 255, 0.1); color: #cfe; }
-        .cp-apply:hover, .cp-reset:hover { transform: scale(1.03); }
+        .cp-apply { background: var(--hud-accent); color: #fff; border-color: transparent; }
+        .cp-reset { background: rgba(255,255,255,.08); color: var(--hud-text); }
+        .cp-apply:hover { background: #3f7ef0; }
+        .cp-reset:hover { background: rgba(255,255,255,.16); }
         .cp-clear {
-            flex: 1; padding: 11px; border: none; border-radius: 8px; cursor: pointer;
-            font-size: 13px; font-weight: 700; transition: all 0.2s;
-            background: linear-gradient(135deg, #ff4d4f, #b91c1c); color: #fff;
+            flex: 1; padding: 11px; border: 1px solid rgba(220,38,38,.5); border-radius: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 700; transition: background .15s;
+            background: rgba(220,38,38,.14); color: #fca5a5;
         }
-        .cp-clear:hover { transform: scale(1.03); box-shadow: 0 0 14px rgba(255, 77, 79, 0.5); }
+        .cp-clear:hover { background: rgba(220,38,38,.26); }
         .cp-generate {
-            flex: 1; padding: 11px; border: none; border-radius: 8px; cursor: pointer;
-            font-size: 13px; font-weight: 700; transition: all 0.2s;
-            background: linear-gradient(135deg, #00d4ff, #0a84ff); color: #04121f;
+            flex: 1; padding: 11px; border: 1px solid var(--hud-accent); border-radius: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 700; transition: background .15s;
+            background: rgba(76,141,255,.16); color: #cfe0ff;
         }
-        .cp-generate:hover { transform: scale(1.03); box-shadow: 0 0 14px rgba(0, 212, 255, 0.5); }
-        .cp-size-block { margin-top: 10px; padding: 10px; border: 1px solid rgba(0, 212, 255, 0.28); border-radius: 10px; background: rgba(0, 212, 255, 0.04); }
-        .cp-sub2 { font-size: 12px; color: #9fe; margin: 2px 0 6px; font-weight: 600; }
+        .cp-generate:hover { background: rgba(76,141,255,.28); }
+        .cp-size-block { margin-top: 10px; padding: 10px; border: 1px solid var(--hud-border); border-radius: 8px; background: rgba(255,255,255,.03); }
+        .cp-sub2 { font-size: 12px; color: var(--hud-text-2); margin: 2px 0 6px; font-weight: 600; }
         .cp-shape-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
-        .cp-shape { padding: 7px 2px; border: 1px solid rgba(0, 212, 255, 0.32); border-radius: 8px; cursor: pointer; background: rgba(255, 255, 255, 0.05); color: #dfe; font-size: 12px; transition: all 0.15s; }
-        .cp-shape:hover { background: rgba(0, 212, 255, 0.18); }
-        .cp-shape.active { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.45); box-shadow: 0 4px 14px rgba(0, 212, 255, 0.35); }
-        .cp-divider { height: 1px; background: rgba(0, 212, 255, 0.25); margin: 16px 0 10px; }
-        .cp-sub { font-size: 13px; color: #00d4ff; font-weight: 700; margin-bottom: 8px; }
+        .cp-shape { padding: 7px 2px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer; background: rgba(255,255,255,.04); color: var(--hud-text); font-size: 12px; transition: background .15s; }
+        .cp-shape:hover { background: rgba(76,141,255,.18); }
+        .cp-shape.active { background: var(--hud-accent); color: #fff; border-color: rgba(255,255,255,.3); }
+        .cp-divider { height: 1px; background: var(--hud-border); margin: 16px 0 10px; }
+        .cp-sub { font-size: 13px; color: var(--hud-accent); font-weight: 700; margin-bottom: 8px; }
         .cp-draw, .cp-draw-ok, .cp-draw-cancel {
-            flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer;
-            font-size: 13px; font-weight: 600; transition: all 0.2s;
+            flex: 1; padding: 10px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 600; transition: background .15s;
         }
-        .cp-draw { background: rgba(255, 209, 102, 0.18); color: #ffd166; border: 1px solid rgba(255, 209, 102, 0.5); }
-        .cp-draw-ok { background: linear-gradient(135deg, #00ff88, #00b894); color: #042; }
-        .cp-draw-cancel { background: rgba(255, 255, 255, 0.1); color: #cfe; }
-        .cp-draw:hover, .cp-draw-ok:hover, .cp-draw-cancel:hover { transform: scale(1.03); }
-        .cp-hint { font-size: 11px; color: #8ab; margin-top: 8px; line-height: 1.5; }
+        .cp-draw { background: rgba(217,119,6,.16); color: #fcd34d; border-color: rgba(217,119,6,.4); }
+        .cp-draw-ok { background: rgba(22,163,74,.2); color: #bbf7d0; border-color: rgba(22,163,74,.4); }
+        .cp-draw-cancel { background: rgba(255,255,255,.08); color: var(--hud-text); }
+        .cp-draw:hover { background: rgba(217,119,6,.28); }
+        .cp-draw-ok:hover { background: rgba(22,163,74,.32); }
+        .cp-draw-cancel:hover { background: rgba(255,255,255,.16); }
+        .cp-hint { font-size: 11px; color: var(--hud-text-2); margin-top: 8px; line-height: 1.6; }
         /* 编辑工具 */
-        .cp-floor { font-size: 11px; color: #9ab; font-weight: 400; margin-left: 6px; }
-        .cp-floor b { color: #00d4ff; }
+        .cp-floor { font-size: 11px; color: var(--hud-text-2); font-weight: 400; margin-left: 6px; }
+        .cp-floor b { color: var(--hud-accent); }
         .cp-edit-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
         .cp-edit-modes button {
-            padding: 9px 6px; border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 8px; cursor: pointer;
-            background: rgba(0, 212, 255, 0.08); color: #cfe; font-size: 12px; transition: all 0.2s;
+            padding: 9px 6px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer;
+            background: rgba(255,255,255,.05); color: var(--hud-text); font-size: 12px; transition: background .15s;
         }
-        .cp-edit-modes button:hover { background: rgba(0, 212, 255, 0.2); }
-        .cp-edit-modes button.active { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.4); box-shadow: 0 4px 15px rgba(0, 212, 255, 0.35); }
-        .cp-edit-sub { margin-top: 10px; animation: fadeIn 0.2s ease; }
+        .cp-edit-modes button:hover { background: rgba(76,141,255,.18); }
+        .cp-edit-modes button.active { background: var(--hud-accent); color: #fff; border-color: rgba(255,255,255,.25); }
+        .cp-edit-sub { margin-top: 10px; }
         .cp-sw-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-        .cp-sw-row .sw { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255, 255, 255, 0.3); transition: transform 0.15s; }
-        .cp-sw-row .sw:hover { transform: scale(1.15); }
-        .sw-fac { padding: 7px 10px; border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 8px; cursor: pointer; background: rgba(0, 212, 255, 0.08); color: #cfe; font-size: 12px; }
-        .sw-fac.active { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.4); }
-        .cp-mini { flex: 1; padding: 8px 4px; border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 8px; cursor: pointer; background: rgba(255, 255, 255, 0.06); color: #dfe; font-size: 12px; }
-        .cp-mini:hover { background: rgba(0, 212, 255, 0.18); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+        .cp-sw-row .sw { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,.3); transition: transform .15s; }
+        .cp-sw-row .sw:hover { transform: scale(1.12); }
+        .sw-fac { padding: 7px 10px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer; background: rgba(255,255,255,.05); color: var(--hud-text); font-size: 12px; }
+        .sw-fac.active { background: var(--hud-accent); color: #fff; border-color: rgba(255,255,255,.25); }
+        .cp-mini { flex: 1; padding: 8px 4px; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer; background: rgba(255,255,255,.06); color: var(--hud-text); font-size: 12px; }
+        .cp-mini:hover { background: rgba(76,141,255,.18); }
         body.editing-mode .indoorCanvas, body.editing-mode #indoorCanvas { cursor: crosshair; }
 
         /* 选中详情中的导航按钮与步骤 */
         .hud-detail-actions { margin-top: 10px; }
         .nav-btn {
-            padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer;
-            background: linear-gradient(135deg, #00d4ff, #00b894); color: #042; font-weight: 700; font-size: 13px;
-            transition: all 0.2s;
+            padding: 8px 16px; border: 1px solid var(--hud-accent); border-radius: 6px; cursor: pointer;
+            background: rgba(76,141,255,.18); color: #cfe0ff; font-weight: 600; font-size: 13px;
+            transition: background .15s;
         }
-        .nav-btn:hover { transform: scale(1.04); }
-        .hud-nav-steps {
-            margin-top: 10px; border-top: 1px dashed rgba(0, 212, 255, 0.3); padding-top: 10px;
-            font-size: 12px; color: #bcd;
+        .nav-btn:hover { background: rgba(76,141,255,.3); }
+        .loc-btn {
+            padding: 8px 16px; border: 1px solid rgba(217,119,6,.5); border-radius: 6px; cursor: pointer;
+            background: rgba(217,119,6,.16); color: #fcd34d; font-weight: 600; font-size: 13px;
+            transition: background .15s;
         }
-        .hud-nav-steps .ns-title { color: #00ff88; font-weight: 700; margin-bottom: 6px; }
-        .hud-nav-steps ol { margin: 0; padding-left: 18px; }
-        .hud-nav-steps li { margin-bottom: 5px; line-height: 1.45; }
+        .loc-btn:hover { background: rgba(217,119,6,.28); }
+        .loc-btn.active { background: rgba(220,38,38,.24); border-color: rgba(220,38,38,.6); color: #fca5a5; }
+        .hud-mypos {
+            margin-top: 12px; border-top: 1px dashed rgba(217,119,6,.4); padding-top: 10px;
+            font-size: 12px; color: var(--hud-text); background: rgba(217,119,6,.06); border-radius: 6px; padding: 10px;
+        }
+        .hud-mypos .mp-title { color: #fcd34d; font-weight: 700; margin-bottom: 8px; }
+        .hud-mypos .mp-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .hud-mypos .mp-row span { color: var(--hud-text-2); }
+        .hud-mypos .mp-row b { color: #fff; font-variant-numeric: tabular-nums; }
+        .hud-mypos .mp-clear {
+            margin-top: 8px; width: 100%; padding: 6px; border: 1px solid rgba(220,38,38,.4); border-radius: 6px; cursor: pointer;
+            background: rgba(220,38,38,.14); color: #fca5a5; font-size: 12px; font-weight: 600;
+        }
+        .hud-mypos .mp-clear:hover { background: rgba(220,38,38,.26); }
+        /* 导航路线浮层：右下角、可折叠、半透明，避免遮挡建模 */
+        .hud-navbox {
+            right: 16px; bottom: 16px; width: min(300px, 86vw);
+            background: var(--hud-bg);
+            border: 1px solid rgba(22,163,74,.4); border-radius: var(--radius);
+            overflow: hidden; box-shadow: var(--hud-shadow);
+        }
+        .hud-navbox .nb-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 9px 14px; cursor: pointer; user-select: none;
+            background: rgba(22,163,74,.12);
+        }
+        .hud-navbox .nb-title { font-size: 13px; font-weight: 700; color: #4ade80; }
+        .hud-navbox .nb-toggle { font-size: 13px; color: var(--hud-text-2); transition: transform .2s; }
+        .hud-navbox.collapsed .nb-toggle { transform: rotate(-90deg); }
+        .hud-navbox.collapsed .nb-body { display: none; }
+        .hud-navbox .nb-body { max-height: 46vh; overflow-y: auto; padding: 10px 14px 12px; }
+        .hud-navbox ol { margin: 0; padding-left: 18px; }
+        .hud-navbox li { font-size: 12px; color: var(--hud-text); margin-bottom: 5px; line-height: 1.45; }
         .nav-stop {
-            margin-top: 10px; padding: 6px 14px; border: 1px solid rgba(255, 95, 109, 0.5);
-            background: rgba(255, 95, 109, 0.12); color: #ff8b95; border-radius: 8px; cursor: pointer; font-size: 12px;
+            margin-top: 10px; padding: 6px 14px; border: 1px solid rgba(220,38,38,.5);
+            background: rgba(220,38,38,.12); color: #fca5a5; border-radius: 6px; cursor: pointer; font-size: 12px;
         }
-        .nav-stop:hover { background: rgba(255, 95, 109, 0.25); }
+        .nav-stop:hover { background: rgba(220,38,38,.24); }
 
-        /* ===== 教程与引导增强（自定义建模易用性） ===== */
-        .hud-btn.tut-btn { background: linear-gradient(135deg, #7b2cbf, #00d4ff); color: #fff; border: 1px solid rgba(255, 255, 255, 0.45); }
-        .hud-btn.tut-btn:hover { box-shadow: 0 4px 16px rgba(123, 44, 191, 0.5); }
-        @keyframes tutPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(123, 44, 191, 0.55); }
-            50% { box-shadow: 0 0 0 9px rgba(123, 44, 191, 0); }
-        }
-        .tut-pulse { animation: tutPulse 1.1s ease-in-out 3; }
+        /* ===== 教程与引导 ===== */
+        .hud-btn.tut-btn { background: var(--hud-accent); color: #fff; border: 1px solid transparent; }
+        .hud-btn.tut-btn:hover { background: #3f7ef0; }
 
         .tut-overlay {
             position: fixed; inset: 0; z-index: 9999; display: none;
             align-items: center; justify-content: center; padding: 20px;
-            background: rgba(8, 10, 25, 0.8); backdrop-filter: blur(6px);
+            background: rgba(15,17,21,.7);
         }
-        .tut-overlay.show { display: flex; animation: fadeIn 0.25s ease; }
+        .tut-overlay.show { display: flex; }
         .tut-box {
             width: min(580px, 94vw); max-height: 86vh; overflow: auto;
-            background: linear-gradient(160deg, #1b2447, #141a33);
-            border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 18px;
-            padding: 26px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            background: #1b1f27;
+            border: 1px solid var(--hud-border); border-radius: 12px;
+            padding: 24px; box-shadow: var(--hud-shadow);
         }
         .tut-title {
-            font-size: 20px; font-weight: 800; margin-bottom: 12px;
-            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-size: 19px; font-weight: 700; margin-bottom: 12px;
+            color: #fff;
         }
-        .tut-progress { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); margin: 12px 0; overflow: hidden; }
-        .tut-progress > i { display: block; height: 100%; width: 11%; background: linear-gradient(90deg, #00d4ff, #7b2cbf); transition: width 0.3s; }
-        .tut-step-n { font-size: 12px; color: #7fd; letter-spacing: 1px; }
-        .tut-step-body { margin: 12px 0 18px; color: #dde; font-size: 14px; line-height: 1.75; }
-        .tut-step-body b { color: #5fe; }
-        .tut-step-body code { background: rgba(0, 212, 255, 0.14); padding: 1px 6px; border-radius: 5px; color: #9ff; font-size: 13px; }
+        .tut-progress { height: 6px; border-radius: 6px; background: rgba(255,255,255,.1); margin: 12px 0; overflow: hidden; }
+        .tut-progress > i { display: block; height: 100%; width: 11%; background: var(--hud-accent); transition: width 0.3s; }
+        .tut-step-n { font-size: 12px; color: var(--hud-accent); letter-spacing: 1px; }
+        .tut-step-body { margin: 12px 0 18px; color: var(--hud-text); font-size: 14px; line-height: 1.7; }
+        .tut-step-body b { color: #fff; }
+        .tut-step-body code { background: rgba(76,141,255,.14); padding: 1px 6px; border-radius: 5px; color: #cfe0ff; font-size: 13px; }
         .tut-nav { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
-        .tut-nav button { padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(0, 212, 255, 0.4); cursor: pointer; font-size: 13px; background: rgba(0, 212, 255, 0.1); color: #cfe; }
-        .tut-nav button.primary { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border-color: rgba(255, 255, 255, 0.4); }
-        .tut-nav button.tut-skip { margin-right: auto; background: none; border: none; color: #889; }
+        .tut-nav button { padding: 9px 18px; border-radius: 6px; border: 1px solid var(--hud-border); cursor: pointer; font-size: 13px; background: rgba(255,255,255,.06); color: var(--hud-text); }
+        .tut-nav button.primary { background: var(--hud-accent); color: #fff; border-color: transparent; }
+        .tut-nav button.tut-skip { margin-right: auto; background: none; border: none; color: var(--hud-text-2); }
 
         /* 快速开始清单 */
-        .qs-box { margin: 6px 0 12px; border: 1px solid rgba(0, 212, 255, 0.25); border-radius: 12px; background: rgba(0, 212, 255, 0.05); overflow: hidden; }
-        .qs-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer; font-size: 13px; color: #9ef; }
-        .qs-head .qs-tip { font-size: 11px; color: #7ab; }
+        .qs-box { margin: 6px 0 12px; border: 1px solid var(--hud-border); border-radius: 10px; background: rgba(255,255,255,.03); overflow: hidden; }
+        .qs-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer; font-size: 13px; color: var(--hud-text); }
+        .qs-head .qs-tip { font-size: 11px; color: var(--hud-text-2); }
         .qs-list { list-style: none; padding: 6px 10px 10px; margin: 0; }
-        .qs-item { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #cde; transition: background 0.15s; }
-        .qs-item:hover { background: rgba(0, 212, 255, 0.12); }
-        .qs-check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(0, 212, 255, 0.5); flex: none; display: grid; place-items: center; font-size: 11px; color: #5fe; }
-        .qs-item.done .qs-check { background: #19c37d; border-color: #19c37d; color: #fff; }
-        .qs-item.done .qs-text { color: #8a9; text-decoration: line-through; }
-        .qs-badge { margin-left: auto; font-size: 11px; color: #7fd; }
+        .qs-item { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--hud-text); transition: background .15s; }
+        .qs-item:hover { background: rgba(76,141,255,.12); }
+        .qs-check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(76,141,255,.5); flex: none; display: grid; place-items: center; font-size: 11px; color: var(--hud-accent); }
+        .qs-item.done .qs-check { background: var(--ok); border-color: var(--ok); color: #fff; }
+        .qs-item.done .qs-text { color: var(--hud-text-2); text-decoration: line-through; }
+        .qs-badge { margin-left: auto; font-size: 11px; color: var(--hud-accent); }
 
         /* 增强的编辑提示 */
-        .cp-hint.enh { background: rgba(0, 212, 255, 0.1); border-left: 3px solid #00d4ff; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; color: #bfe; line-height: 1.6; margin-top: 8px; }
-        .cp-hint.enh b { color: #5fe; }
-        .cp-hint.enh .next { display: block; margin-top: 6px; color: #9fd; font-size: 11.5px; }
-        .flash-ring { box-shadow: 0 0 0 3px #00d4ff !important; transition: box-shadow 0.3s; }
+        .cp-hint.enh { background: rgba(76,141,255,.1); border-left: 3px solid var(--hud-accent); padding: 9px 12px; border-radius: 6px; font-size: 12.5px; color: var(--hud-text); line-height: 1.6; margin-top: 8px; }
+        .cp-hint.enh b { color: #fff; }
+        .cp-hint.enh .next { display: block; margin-top: 6px; color: var(--hud-text-2); font-size: 11.5px; }
+        .flash-ring { box-shadow: 0 0 0 3px var(--hud-accent) !important; transition: box-shadow 0.3s; }
 
         /* ===== 上传数据生成建模 ===== */
-        .cp-upload { width: 100%; padding: 10px 0; border: 1px dashed #00d4ff; border-radius: 10px; background: rgba(0, 212, 255, 0.12); color: #aef6ff; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-        .cp-upload:hover { background: rgba(0, 212, 255, 0.22); transform: scale(1.02); }
-        .data-modal { position: fixed; inset: 0; z-index: 9998; display: none; align-items: center; justify-content: center; background: rgba(2, 8, 20, 0.72); backdrop-filter: blur(3px); }
-        .data-modal.show { display: flex; animation: fadeIn 0.2s ease; }
-        .data-modal-box { width: min(680px, 92vw); max-height: 88vh; display: flex; flex-direction: column; background: linear-gradient(160deg, #0c1a30, #0a1424); border: 1px solid rgba(0, 212, 255, 0.35); border-radius: 16px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6); overflow: hidden; }
-        .data-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(0, 212, 255, 0.1); color: #cdf3ff; font-size: 15px; font-weight: 700; }
-        .data-close { background: none; border: none; color: #9fd; font-size: 18px; cursor: pointer; line-height: 1; }
+        .cp-upload { width: 100%; padding: 10px 0; border: 1px dashed var(--hud-accent); border-radius: 8px; background: rgba(76,141,255,.1); color: #cfe0ff; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
+        .cp-upload:hover { background: rgba(76,141,255,.2); }
+        .data-modal { position: fixed; inset: 0; z-index: 10001; display: none; align-items: center; justify-content: center; background: rgba(15,17,21,.7); }
+        .data-modal.show { display: flex; }
+        .data-modal-box { width: min(680px, 92vw); max-height: 88vh; display: flex; flex-direction: column; background: #1b1f27; border: 1px solid var(--hud-border); border-radius: 12px; box-shadow: var(--hud-shadow); overflow: hidden; }
+        .data-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(76,141,255,.1); color: #eaf1ff; font-size: 15px; font-weight: 700; }
+        .data-close { background: none; border: none; color: var(--hud-text-2); font-size: 18px; cursor: pointer; line-height: 1; }
+        .data-close:hover { color: #fff; }
         .data-modal-body { padding: 16px 18px; overflow: auto; }
-        .data-tip { margin: 0 0 14px; color: #9fb6cf; font-size: 12.5px; line-height: 1.6; }
-        .data-tip code { background: rgba(0, 212, 255, 0.14); padding: 1px 5px; border-radius: 4px; color: #aef; }
+        .data-tip { margin: 0 0 14px; color: var(--hud-text-2); font-size: 12.5px; line-height: 1.6; }
+        .data-tip code { background: rgba(76,141,255,.14); padding: 1px 5px; border-radius: 4px; color: #cfe0ff; }
         .data-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-        .data-file-btn { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 8px; background: rgba(0, 212, 255, 0.18); color: #aef6ff; font-size: 13px; cursor: pointer; border: 1px solid rgba(0, 212, 255, 0.4); }
-        .data-file-btn:hover { background: rgba(0, 212, 255, 0.3); }
-        .data-btn { padding: 8px 14px; border-radius: 8px; background: rgba(255, 255, 255, 0.07); color: #cfe; font-size: 13px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.16); }
-        .data-btn:hover { background: rgba(255, 255, 255, 0.14); }
-        .data-text { width: 100%; height: 220px; resize: vertical; box-sizing: border-box; background: #06101e; color: #d6f0ff; border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 10px; padding: 10px 12px; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; outline: none; }
+        .data-file-btn { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 6px; background: rgba(76,141,255,.14); color: #cfe0ff; font-size: 13px; cursor: pointer; border: 1px solid rgba(76,141,255,.35); }
+        .data-file-btn:hover { background: rgba(76,141,255,.24); }
+        .data-btn { padding: 8px 14px; border-radius: 6px; background: rgba(255,255,255,.06); color: var(--hud-text); font-size: 13px; cursor: pointer; border: 1px solid var(--hud-border); }
+        .data-btn:hover { background: rgba(255,255,255,.14); }
+        .data-text { width: 100%; height: 220px; resize: vertical; box-sizing: border-box; background: #11151c; color: #d6e4f5; border: 1px solid var(--hud-border); border-radius: 8px; padding: 10px 12px; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; outline: none; }
         .data-msg { min-height: 18px; margin-top: 10px; font-size: 12.5px; }
         .data-msg.ok { color: #6ee7a8; }
         .data-msg.err { color: #ff7a7d; }
-        .data-modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
-        .data-btn-ghost { padding: 9px 18px; border-radius: 9px; background: transparent; color: #9fb6cf; font-size: 13px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.2); }
-        .data-btn-primary { padding: 9px 20px; border-radius: 9px; background: linear-gradient(90deg, #00d4ff, #7b2cbf); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; border: none; box-shadow: 0 4px 16px rgba(0, 212, 255, 0.35); }
-        .data-btn-primary:hover { filter: brightness(1.1); }
-    </style>
+        .data-modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--hud-border); }
+        .data-btn-ghost { padding: 9px 18px; border-radius: 6px; background: transparent; color: var(--hud-text-2); font-size: 13px; cursor: pointer; border: 1px solid var(--hud-border); }
+        .data-btn-ghost:hover { color: #fff; border-color: #fff; }
+        .data-btn-primary { padding: 9px 20px; border-radius: 6px; background: var(--hud-accent); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid transparent; }
+        .data-btn-primary:hover { background: #3f7ef0; }
+</style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏢 室内地图导航系统</h1>
+            <h1>室内地图导航系统</h1>
             <p>基于高德地图 JS API 2.0 · 支持搜索、楼层切换和室内导航</p>
-            <span id="modeBadge" class="mode-badge-out">🌍 室外地图模式</span>
+            <span id="modeBadge" class="mode-badge-out">室外地图模式</span>
         </div>
         
         <div class="main-layout">
             <div class="sidebar">
                 <!-- 搜索区域 -->
                 <div class="search-section">
-                    <h3>🔍 搜索商场</h3>
+                    <h3>搜索建筑 / 地点</h3>
                     <div class="search-box">
-                        <input type="text" class="search-input" id="searchInput" placeholder="输入商场名称，如：国贸、大悦城..." />
+                        <input type="text" class="search-input" id="searchInput" placeholder="输入建筑或地点名称，如：国贸、腾讯大厦..." />
                         <button class="search-btn" id="searchBtn" onclick="searchBuildings()">搜索</button>
                     </div>
                     <div class="search-tips">
-                        💡 提示：搜索会自动查找有室内地图数据的商场
+                        提示：搜索任何建筑或地点，点击即可进入 3D 漫游建模（不限商场）
                     </div>
                     
                     <!-- 搜索结果 -->
@@ -784,12 +848,12 @@
                 <div class="building-info" id="buildingInfo" style="display: none;">
                     <h4 id="currentBuildingName">--</h4>
                     <p id="currentBuildingAddr">--</p>
-                    <button class="enter-mall-btn" id="enterMallBtn" style="display:none;" onclick="enterMall()">🏪 进入商场 3D 漫游</button>
+                    <button class="enter-mall-btn" id="enterMallBtn" style="display:none;" onclick="enterBuilding()">进入 3D 漫游</button>
                 </div>
                 
                 <!-- 楼层选择器 -->
                 <div class="floor-section" id="floorSection" style="display: none;">
-                    <h3>🏢 楼层导航</h3>
+                    <h3>楼层导航</h3>
                     <div class="floor-info" id="floorInfo">
                         点击楼层切换视图
                     </div>
@@ -820,7 +884,7 @@
                 <div class="preset-section">
                     <div class="section-title">
                         <span>📍</span>
-                        <span>快速选择（北京热门商场）</span>
+                        <span>快速选择（北京热门建筑）</span>
                     </div>
                     <div class="building-list">
                         <div class="building-item active" data-building="B000A856LJ" data-name="北京国贸中心" data-lng="116.4608" data-lat="39.9097">
@@ -844,7 +908,7 @@
                 
                 <div class="demo-mode">
                     <h4>ℹ️ 使用说明</h4>
-                    <p>• 直接<strong>点击地图上的商场标注</strong>即可进入 3D 漫游<br>• 或搜索/选择商场后点击「进入商场 3D 漫游」<br>• 在左侧或地图右侧切换楼层<br>• 不同颜色代表不同功能区</p>
+                    <p>• 直接<strong>点击地图上的建筑标注</strong>即可读取高德数据并进入 3D 漫游<br>• 或搜索/选择任意建筑后点击「进入 3D 漫游」<br>• 在左侧或地图右侧切换楼层<br>• 不同颜色代表不同功能区</p>
                 </div>
             </div>
             
@@ -858,12 +922,12 @@
 
                 <!-- 点击地图建筑进入 3D 的提示 -->
                 <div class="map-hint" id="mapHint">
-                    <span>🖱️ 点击地图上的<strong>商场标注</strong>即可读取高德数据并进入 3D 漫游</span>
+                    <span>点击地图上的<strong>建筑标注</strong>即可读取高德数据并进入 3D 漫游（不限商场）</span>
                     <button class="map-hint-close" id="mapHintClose" title="关闭提示">×</button>
                 </div>
 
                 <div id="status" class="status-bar loading">
-                    <span>⏳</span>
+                    <span>·</span>
                     <span>正在初始化地图...</span>
                 </div>
             </div>
@@ -872,19 +936,30 @@
 
     <!-- 室内 3D 漫游叠加层 -->
     <div id="indoorOverlay">
-        <div class="indoor-loading" id="indoorLoading"><span class="loading-spinner"></span> 正在构建 3D 商场模型…</div>
+        <div class="indoor-loading" id="indoorLoading"><span class="loading-spinner"></span> 正在构建 3D 建筑模型…</div>
         <!-- HUD：顶部栏 -->
         <div class="hud hud-top">
-            <div class="mall-title" id="hudMallTitle">🏪 商场<small id="hudMallSub">室内 3D 模式</small></div>
+            <div class="mall-title" id="hudMallTitle">建筑<small id="hudMallSub">室内 3D 模式</small></div>
             <div class="top-right">
-                <span class="mode-badge">🏪 室内 3D 模式</span>
-                <button class="hud-btn tut-btn" onclick="openTutorial()">📖 教程</button>
+                <span class="mode-badge">室内 3D 模式</span>
+                <button class="hud-btn tut-btn" onclick="openTutorial()">教程</button>
                 <button class="hud-btn" id="customBtn" onclick="toggleCustomPanel()">⚙ 自定义</button>
                 <button class="return-btn" onclick="exitMall()">← 返回地图</button>
             </div>
         </div>
         <!-- HUD：右侧楼层控制器 -->
         <div class="hud hud-right" id="hudFloorCtrl"></div>
+        <!-- HUD：标记位置（左下角浮层） -->
+        <div class="hud hud-locate" id="hudLocateBox">
+            <button class="loc-btn" id="hudLocateBtn">📍 标记我的位置</button>
+            <div class="hud-mypos" id="hudMyPos" style="display:none;">
+                <div class="mp-title">📍 我的位置（大体坐标）</div>
+                <div class="mp-row"><span>楼层</span><b id="mpFloor">—</b></div>
+                <div class="mp-row"><span>X</span><b id="mpX">—</b></div>
+                <div class="mp-row"><span>Z</span><b id="mpZ">—</b></div>
+                <button class="mp-clear" id="hudMyPosClear" onclick="clearMyLocation()">✕ 清除定位</button>
+            </div>
+        </div>
         <!-- HUD：左侧店铺列表 -->
         <div class="hud hud-left">
             <h4>🛍️ 本层店铺</h4>
@@ -897,21 +972,28 @@
                 <div><span class="cat-tag" id="hudDetailCat"></span><span id="hudDetailFloor" style="font-size:11px;color:#9ab;"></span></div>
                 <p id="hudDetailDesc"></p>
                 <div class="hud-detail-actions">
-                    <button class="nav-btn" id="hudNavBtn">🧭 导航到这里</button>
+                    <button class="nav-btn" id="hudNavBtn">导航到这里</button>
                 </div>
-                <div class="hud-nav-steps" id="hudNavSteps" style="display:none;"></div>
             </div>
-            <div class="hud-hint">🖱️ 拖拽旋转 · 滚轮缩放 · 悬停查看店铺 · 点击选中 · 右侧切换楼层</div>
+            <div class="hud-hint">拖拽旋转 · 滚轮缩放 · 悬停查看店铺 · 点击选中 · 右侧切换楼层</div>
+        </div>
+        <!-- HUD：导航路线浮层（顶部居中、可折叠，避免遮挡建模） -->
+        <div class="hud hud-navbox" id="hudNavBox" style="display:none;">
+            <div class="nb-head" onclick="toggleNavBox()">
+                <span class="nb-title" id="hudNavTitle">导航路线</span>
+                <span class="nb-toggle" id="hudNavToggle">▾</span>
+            </div>
+            <div class="nb-body" id="hudNavSteps"></div>
         </div>
         <!-- 悬停浮层 -->
         <div class="hud-tooltip" id="hudTooltip"></div>
 
         <!-- 自定义 3D 建模面板 -->
         <div class="hud hud-custom" id="customPanel">
-            <div class="cp-head">⚙ 3D 建模自定义 <button class="cp-close" onclick="toggleCustomPanel()">✕</button></div>
+            <div class="cp-head">3D 建模自定义 <button class="cp-close" onclick="toggleCustomPanel()">✕</button></div>
             <div class="qs-box" id="qsBox">
                 <div class="qs-head" onclick="toggleQS()">
-                    <span>🚀 快速开始（5 步建模）</span>
+                    <span>建模步骤</span>
                     <span class="qs-tip" id="qsToggle">收起 ▾</span>
                 </div>
                 <ul class="qs-list" id="qsList">
@@ -942,6 +1024,17 @@
                 <label>店铺行数 <span id="valROWS">6</span></label>
                 <input type="range" id="cfgROWS" min="3" max="10" step="1" value="6">
             </div>
+            <div class="cp-divider"></div>
+            <div class="cp-sub">楼层设置 <span class="cp-floor">地上 <b id="valAbove">1</b> / 地下 <b id="valBelow">0</b></span></div>
+            <div class="cp-field cp-floor-count">
+                <label>地上层数（1 层起）</label>
+                <input type="number" id="cfgAbove" min="0" max="40" step="1" value="1">
+                <label>地下层数（B 层）</label>
+                <input type="number" id="cfgBelow" min="0" max="10" step="1" value="0">
+            </div>
+            <div class="cp-actions">
+                <button class="cp-apply" onclick="applyFloorCount()">应用层数并重建</button>
+            </div>
             <label class="cp-check"><input type="checkbox" id="cfgAtrium" checked> 中庭广场（中央留空）</label>
             <label class="cp-check"><input type="checkbox" id="cfgLabels" checked> 显示店铺文字标签</label>
             <label class="cp-check"><input type="checkbox" id="cfgRotate"> 自动旋转视角</label>
@@ -950,19 +1043,19 @@
                 <button class="cp-reset" onclick="resetCustomConfig()">重置默认</button>
             </div>
             <div class="cp-actions">
-                <button class="cp-clear" onclick="clearAllModeling()">🧹 一键清空建模</button>
-                <button class="cp-generate" onclick="generateAllModeling()">🏗 一键生成建模</button>
+                <button class="cp-clear" onclick="clearAllModeling()">清空建模</button>
+                <button class="cp-generate" onclick="generateAllModeling()">生成建模</button>
             </div>
             <div class="cp-actions">
-                <button class="cp-upload" onclick="openDataModal()">📥 上传数据生成</button>
+                <button class="cp-upload" onclick="openDataModal()">上传数据生成</button>
             </div>
             <div class="cp-divider"></div>
             <div class="cp-sub">编辑工具 <span class="cp-floor">当前层：<b id="cpEditFloor">F1</b></span></div>
             <div class="cp-edit-modes" id="editModeRow">
-                <button data-mode="wall" onclick="setEditMode('wall')">🧱 加内墙</button>
+                <button data-mode="wall" onclick="setEditMode('wall')">加内墙</button>
                 <button data-mode="shop" onclick="setEditMode('shop')">🏬 编辑店铺</button>
                 <button data-mode="facility" onclick="setEditMode('facility')">🛗 放设施</button>
-                <button data-mode="" class="active" onclick="setEditMode('')">👁 浏览</button>
+                <button data-mode="" class="active" onclick="setEditMode('')">浏览</button>
             </div>
             <div class="cp-edit-sub" id="editShopTools" style="display:none">
                 <div class="cp-sw-row">
@@ -1000,14 +1093,14 @@
                 </div>
                 <div class="cp-actions">
                     <button class="cp-mini" onclick="addShopHere()">➕ 新增</button>
-                    <button class="cp-mini" onclick="deleteSelectedShop()">🗑 删除</button>
+                    <button class="cp-mini" onclick="deleteSelectedShop()">删除</button>
                     <button class="cp-mini" onclick="undoSelectedShop()">↩ 复位</button>
                 </div>
             </div>
             <div class="cp-edit-sub" id="editWallTools" style="display:none">
                 <div class="cp-actions">
                     <button class="cp-mini" onclick="undoLastWall()">↩ 撤销一段</button>
-                    <button class="cp-mini" onclick="clearFloorWalls()">🗑 清空本层</button>
+                    <button class="cp-mini" onclick="clearFloorWalls()">清空本层</button>
                 </div>
             </div>
             <div class="cp-edit-sub" id="editFacilityTools" style="display:none">
@@ -1022,9 +1115,9 @@
             <div class="cp-divider"></div>
             <div class="cp-sub">自由绘制建筑轮廓（墙体）</div>
             <div class="cp-actions">
-                <button class="cp-draw" onclick="startDrawFootprint()">✏️ 整栋轮廓</button>
-                <button class="cp-draw" onclick="startDrawFloorFootprint()">✏️ 本层轮廓</button>
-                <button class="cp-draw-ok" onclick="finishDrawFootprint()">✅ 完成轮廓</button>
+                <button class="cp-draw" onclick="startDrawFootprint()">整栋轮廓</button>
+                <button class="cp-draw" onclick="startDrawFloorFootprint()">本层轮廓</button>
+                <button class="cp-draw-ok" onclick="finishDrawFootprint()">完成轮廓</button>
             </div>
             <div class="cp-actions">
                 <button class="cp-draw-cancel" onclick="cancelDrawFootprint()">↺ 取消</button>
@@ -1058,6 +1151,7 @@
         let placeSearch = null;
         let floorData = []; // 当前建筑的楼层数据
         let currentFloor = null; // 当前显示的楼层
+        let userFloorOverride = false; // 用户是否手动设置了楼层（防止高德异步真实楼层覆盖用户选择）
 
         // 地图点击进入 3D 漫游相关状态
         let _lastMarkerClickTs = 0;        // 抑制「标记点击」误触发的 map click
@@ -1114,7 +1208,7 @@
         // 更新状态栏
         function updateStatus(message, type = 'loading') {
             const statusEl = document.getElementById('status');
-            const icons = { loading: '⏳', success: '✅', error: '❌' };
+            const icons = { loading: '·', success: '✓', error: '✕' };
             statusEl.className = `status-bar ${type}`;
             statusEl.innerHTML = `<span>${icons[type]}</span><span>${message}</span>`;
         }
@@ -1232,36 +1326,28 @@
                 if (status === 'complete' && result.info === 'OK') {
                     displaySearchResults(result.poiList.pois);
                 } else if (status === 'no_data') {
-                    resultsContainer.innerHTML = '<div class="no-results">😔 未找到相关商场<br>建议尝试其他关键词，如：商场、购物中心、百货</div>';
+                    resultsContainer.innerHTML = '<div class="no-results">未找到相关结果<br>建议尝试更具体的建筑或地点名称</div>';
                     updateStatus('搜索完成，未找到结果', 'error');
                 } else {
-                    resultsContainer.innerHTML = '<div class="no-results">❌ 搜索失败，请稍后重试</div>';
+                    resultsContainer.innerHTML = '<div class="no-results">搜索失败，请稍后重试</div>';
                     updateStatus('搜索失败: ' + status, 'error');
                 }
             });
         }
         
-        // 显示搜索结果
+        // 显示搜索结果（不限商场：楼宇 / 地标 / 商场等任意 POI 均可点击进入 3D）
         function displaySearchResults(pois) {
             const resultsContainer = document.getElementById('searchResults');
-            
+
             if (!pois || pois.length === 0) {
-                resultsContainer.innerHTML = '<div class="no-results">😔 未找到相关商场</div>';
+                resultsContainer.innerHTML = '<div class="no-results">未找到相关结果</div>';
                 updateStatus('搜索完成，未找到结果', 'error');
                 return;
             }
-            
-            const indoorKeywords = ['商场', '购物中心', '百货', 'mall', 'shopping', '中心', '城', '广场'];
-            const filteredPois = pois.filter(poi => {
-                const name = (poi.name || '').toLowerCase();
-                const type = (poi.type || '').toLowerCase();
-                return indoorKeywords.some(kw => name.includes(kw) || type.includes(kw));
-            });
-            
-            const displayPois = filteredPois.length > 0 ? filteredPois : pois;
-            
+
+            // 不再限定商场类型：展示全部搜索到的 POI，保留「有室内地图数据」徽标，并提示可进入 3D
             let html = '';
-            displayPois.forEach(poi => {
+            pois.forEach(poi => {
                 const name = poi.name || '未知';
                 const address = poi.address || '地址未知';
                 const type = poi.type || '';
@@ -1269,11 +1355,11 @@
                 const lng = poi.location ? poi.location.lng : null;
                 const lat = poi.location ? poi.location.lat : null;
                 const poiId = poi.id || '';
-                
+
                 html += `
-                    <div class="result-item" 
-                         data-name="${name}" 
-                         data-lng="${lng}" 
+                    <div class="result-item"
+                         data-name="${name}"
+                         data-lng="${lng}"
                          data-lat="${lat}"
                          data-poiid="${poiId}"
                          data-address="${address}"
@@ -1282,12 +1368,13 @@
                         <p class="address">📍 ${address}</p>
                         <p style="font-size: 11px; color: #666; margin-top: 4px;">${type}</p>
                         ${hasIndoor ? '<span class="has-indoor">✓ 有室内地图数据</span>' : ''}
+                        <span class="enter-hint" style="display:block;margin-top:6px;font-size:12px;color:#2b6cff;font-weight:600;">点击进入 3D 漫游 →</span>
                     </div>
                 `;
             });
-            
+
             resultsContainer.innerHTML = html;
-            updateStatus(`找到 ${displayPois.length} 个相关地点`, 'success');
+            updateStatus(`找到 ${pois.length} 个地点，点击任意一项即可进入 3D 建模`, 'success');
         }
         
         // 选择搜索结果
@@ -1304,11 +1391,11 @@
             }
             
             document.querySelectorAll('.result-item').forEach(item => {
-                item.style.background = 'rgba(255,255,255,0.05)';
-                item.style.borderLeftColor = 'transparent';
+                item.style.background = '';
+                item.style.borderLeftColor = '';
             });
-            element.style.background = 'rgba(0,212,255,0.2)';
-            element.style.borderLeftColor = '#00d4ff';
+            element.style.background = '#eaf1ff';
+            element.style.borderLeftColor = '#2b6cff';
             
             document.querySelectorAll('.building-item').forEach(item => item.classList.remove('active'));
             
@@ -1358,7 +1445,7 @@
          * 点击地图上的建筑 → 读取高德数据 → 进入 3D 漫游
          * ========================================================= */
 
-        // 统一从地图点击/标记进入某个商场（读取高德 POI 数据）
+        // 统一从地图点击/标记进入某个建筑（读取高德 POI 数据，不限商场）
         function enterBuildingFromMap(info) {
             if (!info || !info.poiId) {
                 updateStatus('无法识别该建筑的 POI 信息', 'error');
@@ -1382,7 +1469,7 @@
             updateStatus('正在读取「' + info.name + '」的高德室内数据，进入 3D 漫游…', 'loading');
             // 稍作等待，让真实室内店铺 POI 有机会异步拉取后再构建场景
             setTimeout(function () {
-                if (!indoor.active) enterMall();
+                if (!indoor.active) enterBuilding();
             }, 600);
         }
 
@@ -1421,23 +1508,20 @@
             });
         }
 
-        // 点击地图空白处：周边检索最近的商场/商业体
+        // 点击地图空白处：周边检索最近的建筑（不限商场），取最近 POI 进入 3D
         function handleMapEmptyClick(lnglat) {
             const ll = getLngLat(lnglat);
             if (!ll) return;
             if (!placeSearch) {
-                updateStatus('请点击地图上的商场标注或左侧预设商场', 'error');
+                updateStatus('请点击地图上带名称的建筑标注，或左侧搜索建筑', 'error');
                 return;
             }
-            updateStatus('正在识别该位置的商场…', 'loading');
-            placeSearch.searchNearBy('商场', ll, 300, function (status, result) {
-                if (status === 'complete' && result.info === 'OK' && result.poiList && result.poiList.pois.length) {
-                    const indoorWords = ['商场', '购物中心', '百货', 'shopping', 'mall', '广场', '中心'];
-                    const hit = result.poiList.pois.find(function (p) {
-                        const n = (p.name || '').toLowerCase();
-                        const t = (p.type || '').toLowerCase();
-                        return indoorWords.some(function (k) { return n.indexOf(k) >= 0 || t.indexOf(k) >= 0; });
-                    }) || result.poiList.pois[0];
+            updateStatus('正在识别该位置的建筑…', 'loading');
+
+            // 取最近的一个 POI（不限类型）进入 3D；无结果则提示
+            const pickNearestAndEnter = function (pois) {
+                if (pois && pois.length) {
+                    const hit = pois[0];
                     const hll = getLngLat(hit.location);
                     enterBuildingFromMap({
                         name: hit.name,
@@ -1447,7 +1531,22 @@
                         address: hit.address || ''
                     });
                 } else {
-                    updateStatus('该位置未识别到商场，请点击地图上的商场标注或左侧预设商场', 'error');
+                    updateStatus('该位置附近未识别到建筑，请点击地图上带名称的建筑标注', 'error');
+                }
+            };
+
+            // 优先用空关键词检索附近全部 POI；若高德不接受空关键词则用「建筑」兜底再查一次
+            placeSearch.searchNearBy('', ll, 500, function (status, result) {
+                if (status === 'complete' && result.info === 'OK' && result.poiList && result.poiList.pois.length) {
+                    pickNearestAndEnter(result.poiList.pois);
+                } else {
+                    placeSearch.searchNearBy('建筑', ll, 500, function (s2, r2) {
+                        if (s2 === 'complete' && r2.info === 'OK' && r2.poiList && r2.poiList.pois.length) {
+                            pickNearestAndEnter(r2.poiList.pois);
+                        } else {
+                            updateStatus('该位置附近未识别到建筑，请点击地图上带名称的建筑标注', 'error');
+                        }
+                    });
                 }
             });
         }
@@ -1480,8 +1579,19 @@
         
         // 加载楼层数据
         function loadFloorData(buildingId) {
-            // 优先使用模拟数据，如果没有则生成默认数据
-            floorData = mockFloorData[buildingId] || generateDefaultFloors();
+            userFloorOverride = false; // 切换建筑时重置：由该建筑自身数据决定楼层，允许用户随后手动改写
+            // 楼层来源优先级：高德建筑真实室内楼层 > 已知建筑准确楼层 > 单地面层兜底
+            // 注：高德仅对少数接入室内地图的商场返回真实楼层；其余一律回退到「极少层」而非写死 5 层
+            const realFloors = getBuildingActualFloors();
+            if (realFloors && realFloors.length) {
+                floorData = realFloors;
+            } else if (mockFloorData[buildingId] && mockFloorData[buildingId].length) {
+                // mock 兜底数据按 floorSortKey 排序：保证 B2<B1<L1<L2… 的竖直顺序（B 层在最底）
+                floorData = mockFloorData[buildingId].slice().sort((a, b) => floorSortKey(a.name) - floorSortKey(b.name));
+            } else {
+                floorData = [{ name: 'L1', display: '1层', type: 'shopping', desc: '地面层' }];
+                updateStatus('该地点暂无高德室内楼层数据，已按单地面层呈现，可在「⚙ 自定义」中增删楼层', 'error');
+            }
             
             renderFloorList();
             renderMapFloorControl();
@@ -1496,17 +1606,42 @@
             }
         }
         
-        // 生成默认楼层数据
+        // 兜底楼层：仅在 floorData 为空时的最后防线，返回单地面层（不再写死 5 层）
         function generateDefaultFloors() {
-            return [
-                { name: 'L1', display: '1层', type: 'shopping', desc: '主入口、服务台' },
-                { name: 'L2', display: '2层', type: 'shopping', desc: '时尚购物' },
-                { name: 'L3', display: '3层', type: 'shopping', desc: '品牌专区' },
-                { name: 'L4', display: '4层', type: 'dining', desc: '餐饮美食' },
-                { name: 'B1', display: 'B1层', type: 'shopping', desc: '生活配套' }
-            ];
+            return [{ name: 'L1', display: '1层', type: 'shopping', desc: '地面层' }];
+        }
+
+        // 按「地上 / 地下」层数生成楼层数据：地下 B1… 在最底，地上 1层… 依次向上
+        function buildFloorDataFromCounts(above, below) {
+            const arr = [];
+            for (let i = below; i >= 1; i--) arr.push({ name: 'B' + i, display: 'B' + i + '层', type: 'shopping', desc: '地下层' });
+            for (let i = 1; i <= above; i++) arr.push({ name: 'L' + i, display: i + '层', type: 'shopping', desc: '地面/地上层' });
+            arr.sort((a, b) => floorSortKey(a.name) - floorSortKey(b.name)); // 保证 B2<B1<L1<L2 的竖直顺序
+            return arr;
+        }
+
+        // 用户手动设定楼层数量：覆盖 floorData 并重建（地面/楼层控制器 + 3D 场景）
+        function applyFloorCount() {
+            const aEl = document.getElementById('cfgAbove'), bEl = document.getElementById('cfgBelow');
+            let above = aEl ? Math.max(0, Math.round(parseInt(aEl.value, 10) || 0)) : 1;
+            let below = bEl ? Math.max(0, Math.round(parseInt(bEl.value, 10) || 0)) : 0;
+            if (above + below < 1) { above = 1; below = 0; } // 至少保留 1 层
+            floorData = buildFloorDataFromCounts(above, below);
+            userFloorOverride = true; // 标记为用户手动设定，阻止高德异步真实楼层覆盖
+            renderFloorList();
+            renderMapFloorControl();
+            if (floorData.length) switchFloor(floorData[0].name);
+            // 3D 场景：收敛当前层索引后重建
+            if (indoor.active) {
+                indoor.current = Math.min(indoor.current || 0, floorData.length - 1);
+                rebuildIndoor();
+            }
+            const valA = document.getElementById('valAbove'), valB = document.getElementById('valBelow');
+            if (valA) valA.textContent = above; if (valB) valB.textContent = below;
+            updateStatus('已按 ' + above + ' 地上 / ' + below + ' 地下 共 ' + floorData.length + ' 层重建场景', 'success');
         }
         
+
         // 渲染楼层列表（侧边栏）
         function renderFloorList() {
             const floorList = document.getElementById('floorList');
@@ -1515,10 +1650,11 @@
             floorInfo.textContent = `共 ${floorData.length} 层，点击切换楼层视图`;
             
             let html = '';
-            floorData.forEach(floor => {
+            // 倒序显示，高层在上、地下层在底，与地图楼层控制器一致
+            [...floorData].reverse().forEach(floor => {
                 const typeClass = floor.type || 'shopping';
                 const typeText = getFloorTypeText(floor.type);
-                
+
                 html += `
                     <div class="floor-item" data-floor="${floor.name}" onclick="switchFloor('${floor.name}')">
                         <span class="floor-name">${floor.display}</span>
@@ -1624,6 +1760,41 @@
             for (const k in c) { if (c[k] > bn) { bn = c[k]; best = k; } }
             return best;
         }
+        // 将 POI 的楼层字段映射到建筑真实楼层之一（兼容 F1/L1/B1/数字/-1 等多种写法）
+        function matchRealFloor(pfl, baseFloors) {
+            if (!pfl || !baseFloors || !baseFloors.length) return null;
+            const up = String(pfl).toUpperCase();
+            for (const rf of baseFloors) { if (String(rf.name).toUpperCase() === up) return rf.name; }
+            const m = up.match(/-?\d+/); const n = m ? parseInt(m[0], 10) : NaN;
+            const isB = /B/i.test(up) || (/-?\d+/.test(up) && n < 0);
+            if (!isNaN(n)) {
+                for (const rf of baseFloors) {
+                    const rm = String(rf.name).toUpperCase().match(/-?\d+/); const rn = rm ? parseInt(rm[0], 10) : NaN;
+                    const rB = /B/i.test(rf.name) || (/-?\d+/.test(rf.name) && rn < 0);
+                    if (rn === n && rB === isB) return rf.name;
+                }
+            }
+            return null;
+        }
+        // 从高德建筑对象读取【真实楼层结构】（含 B 层与真实层数），无则返回 null
+        function getBuildingActualFloors() {
+            try {
+                const b = (indoorMap && indoorMap.getBuilding) ? indoorMap.getBuilding() : null;
+                if (!b || !b.floors || !b.floors.length) return null;
+                const seen = {}, tmp = [];
+                b.floors.forEach(fl => {
+                    const code = (fl.floor || fl.floor_name || fl.name || '').toString();
+                    if (!code || seen[code]) return;
+                    seen[code] = 1;
+                    const num = code.match(/-?\d+/); const n = num ? parseInt(num[0], 10) : 0;
+                    const isB = /B/i.test(code) || (/-?\d+/.test(code) && n < 0);
+                    const disp = fl.floor_name || fl.name || (isB ? ('B' + Math.abs(n) + '层') : (Math.abs(n) + '层'));
+                    tmp.push({ name: code, display: disp, type: 'shopping', desc: '高德真实楼层' });
+                });
+                tmp.sort((a, b) => floorSortKey(a.name) - floorSortKey(b.name));
+                return tmp.length ? tmp : null;
+            } catch (e) { return null; }
+        }
         // 提取指定商场的真实室内 POI；失败/无数据则回退到生成式店铺
         function extractIndoorShops(buildingId, lng, lat) {
             realIndoorShops = { available: false, byFloor: {}, floors: [] };
@@ -1637,39 +1808,70 @@
                     if (!building && indoorMap.building) building = indoorMap.building;
                     if (!building) {
                         if (tries++ < 12) { setTimeout(tryGet, 300); return; }
-                        updateStatus('该商场暂无高德室内 POI，使用生成式店铺', 'error');
+                        updateStatus('该地点暂无高德室内数据，使用生成式店铺', 'error');
                         return;
                     }
+
+                    // 1) 优先采用高德建筑的【真实楼层结构】作为楼层列表（不再写死层数）
+                    const realFloors = getBuildingActualFloors();
+
+                    // 2) 拉取室内店铺 POI（用于贴到各楼层）
                     let pois = building.pois;
                     if ((!pois || !pois.length) && building.searchPoi) {
                         try { pois = building.searchPoi(''); } catch (e2) {}
                     }
-                    if (!pois || !pois.length) {
-                        updateStatus('该商场暂无室内店铺 POI，使用生成式店铺', 'error');
-                        return;
+
+                    // 3) 用真实楼层覆盖 floorData，并把 POI 按楼层挂接到对应层
+                    //    若用户已手动设定楼层（userFloorOverride），则尊重用户选择，不覆盖
+                    if (realFloors && !userFloorOverride) {
+                        realIndoorShops.floors = realFloors;
+                        floorData = realFloors;
+                        realIndoorShops.byFloor = {};
+                        realFloors.forEach(f => { realIndoorShops.byFloor[f.name] = []; });
+                        realIndoorShops.available = true;
+                        // 若用户已先进入 3D（此时用的是兜底层），拿到真实楼层后重建场景
+                        if (indoor.active) rebuildIndoor();
                     }
-                    const byFloor = {};
-                    pois.forEach(p => {
-                        const fl = (p.floor || p.level || '');
-                        const cat = mapPoiCategory(p.type);
-                        (byFloor[fl] = byFloor[fl] || []).push({ name: p.name, cat, floor: fl });
-                    });
-                    const floorKeys = Object.keys(byFloor).sort((a, b) => floorSortKey(a) - floorSortKey(b));
-                    if (!floorKeys.length) {
-                        updateStatus('该商场室内 POI 缺少楼层信息，使用生成式店铺', 'error');
-                        return;
+                    if (pois && pois.length) {
+                        // 用户已手动设层时，POI 挂到用户选择的楼层；否则挂到高德真实楼层
+                        const baseFloors = (realFloors && !userFloorOverride) ? realFloors : floorData;
+                        if (!realIndoorShops.byFloor || !Object.keys(realIndoorShops.byFloor).length) {
+                            realIndoorShops.byFloor = {};
+                            floorData.forEach(f => { realIndoorShops.byFloor[f.name] = []; });
+                        }
+                        pois.forEach(p => {
+                            const cat = mapPoiCategory(p.type);
+                            const fk = matchRealFloor(p.floor || p.level || '', baseFloors);
+                            if (fk && realIndoorShops.byFloor[fk]) {
+                                realIndoorShops.byFloor[fk].push({ name: p.name, cat, floor: fk });
+                            } else {
+                                // 楼层无法匹配时归入第一层，避免丢失真实店铺
+                                const first = (floorData[0] && floorData[0].name) || 'L1';
+                                (realIndoorShops.byFloor[first] = realIndoorShops.byFloor[first] || []).push({ name: p.name, cat, floor: first });
+                            }
+                        });
                     }
-                    realIndoorShops.byFloor = byFloor;
-                    realIndoorShops.floors = floorKeys.map(k => ({
-                        name: k, display: prettyFloor(k), type: dominantCat(byFloor[k]), desc: '高德室内楼层'
-                    }));
-                    realIndoorShops.available = true;
-                    // 用真实楼层覆盖 floorData 并刷新 UI
-                    floorData = realIndoorShops.floors;
+
+                    // 4) 无高德室内楼层结构时：不臆造多层，保持上面的兜底层（极少层）；
+                    //    若 POI 含店铺则归入当前唯一楼层，以展示真实店铺
+                    if (!realFloors) {
+                        const floorName = (floorData[0] && floorData[0].name) || 'L1';
+                        realIndoorShops.byFloor = realIndoorShops.byFloor || {};
+                        if (pois && pois.length) {
+                            realIndoorShops.byFloor[floorName] = realIndoorShops.byFloor[floorName] || [];
+                            pois.forEach(p => {
+                                realIndoorShops.byFloor[floorName].push({ name: p.name, cat: mapPoiCategory(p.type), floor: floorName });
+                            });
+                            realIndoorShops.floors = floorData;
+                            realIndoorShops.available = true;
+                        }
+                    }
+
                     renderFloorList();
                     renderMapFloorControl();
                     if (floorData.length) switchFloor(floorData[0].name);
-                    updateStatus('已加载高德真实店铺 ' + pois.length + ' 家（' + floorKeys.length + ' 层）', 'success');
+                    const nPois = (pois && pois.length) ? pois.length : 0;
+                    updateStatus('已加载高德真实楼层 ' + floorData.length + ' 层' + (nPois ? (' / 店铺 ' + nPois + ' 家') : '（暂无 POI，使用生成式店铺）'), 'success');
                 };
                 setTimeout(tryGet, 400);
             } catch (e) {
@@ -1704,7 +1906,7 @@
                     }
                 });
                 
-                updateStatus('室内地图插件加载成功！请搜索或选择商场', 'success');
+                updateStatus('室内地图插件加载成功！请搜索或选择建筑', 'success');
                 
             } catch (error) {
                 updateStatus('室内地图加载失败: ' + error.message, 'error');
@@ -1775,8 +1977,8 @@
                     'POI ID: ' + (currentBuilding || 'N/A') + '<br>' +
                     '当前楼层: ' + (currentFloor || '未选择') + '<br>' +
                     '<button style="margin-top:8px;width:100%;padding:6px 10px;border:none;border-radius:6px;' +
-                    'background:linear-gradient(135deg,#00d4ff,#7b2cbf);color:#fff;cursor:pointer;font-size:13px;" ' +
-                    'onclick="enterMall()">🏪 进入 3D 漫游</button></div>',
+                    'background:#2b6cff;color:#fff;cursor:pointer;font-size:13px;" ' +
+                    'onclick="enterBuilding()">进入 3D 漫游</button></div>',
                 offset: new AMap.Pixel(0, -30)
             });
             
@@ -1838,6 +2040,8 @@
         let editWallPtMarks = [];   // 绘制内墙时的临时角点标记
         let editDrag = null;        // 拖拽中：{ id, floor, fi }
         let editSelShopId = null;   // 当前选中的店铺 id
+        let myPosData = null;       // 用户「我的位置」：{ x, z, floor }（跨重建持久化）
+        let locateMode = false;     // 是否处于「标记我的位置」定位模式
 
         // 取当前楼层名
         function curFloorName() {
@@ -1854,7 +2058,7 @@
         let indoor = {
             active: false, scene: null, camera: null, renderer: null, labelRenderer: null,
             controls: null, raycaster: null, mouse: null, floors: [], current: 0,
-            selected: null, animId: null, mallName: null, nav: null,
+            selected: null, animId: null, mallName: null, nav: null, myPosMarker: null,
             _onMove: null, _onClick: null, _onResize: null
         };
 
@@ -1889,10 +2093,10 @@
             return name;
         }
 
-        // 进入商场 → 切换到室内 3D 模式
-        function enterMall() {
+        // 进入建筑 → 切换到室内 3D 模式（不限商场）
+        function enterBuilding() {
             if (!currentBuilding || !currentBuildingInfo) {
-                updateStatus('请先选择或搜索一个商场', 'error');
+                updateStatus('请先选择或搜索一个建筑', 'error');
                 return;
             }
             if (typeof THREE === 'undefined') {
@@ -1900,12 +2104,12 @@
                 return;
             }
             document.body.classList.add('indoor-mode');
-            document.getElementById('modeBadge').textContent = '🏪 室内 3D 模式';
+            document.getElementById('modeBadge').textContent = '室内 3D 模式';
             const overlay = document.getElementById('indoorOverlay');
             overlay.classList.add('active');
             requestAnimationFrame(() => overlay.classList.add('show'));
-            document.getElementById('hudMallTitle').firstChild.textContent = '🏪 ' + (currentBuildingInfo.name || '商场');
-            buildIndoorScene(currentBuildingInfo.name || '商场');
+            document.getElementById('hudMallTitle').firstChild.textContent = '' + (currentBuildingInfo.name || '建筑');
+            buildIndoorScene(currentBuildingInfo.name || '建筑');
         }
 
         // 返回地图 → 销毁 3D 场景，回到室外
@@ -1914,12 +2118,14 @@
             const panel = document.getElementById('customPanel');
             if (panel) panel.classList.remove('open');
             const ns = document.getElementById('hudNavSteps');
-            if (ns) { ns.style.display = 'none'; ns.innerHTML = ''; }
+            if (ns) ns.innerHTML = '';
+            const navBox = document.getElementById('hudNavBox');
+            if (navBox) navBox.style.display = 'none';
             overlay.classList.remove('show');
             setTimeout(() => {
                 overlay.classList.remove('active');
                 document.body.classList.remove('indoor-mode');
-                document.getElementById('modeBadge').textContent = '🌍 室外地图模式';
+                document.getElementById('modeBadge').textContent = '室外地图模式';
                 disposeIndoor();
                 // 室外地图容器在 3D 模式期间被 display:none 隐藏，恢复可见后尺寸变为 0，
                 // 高德地图不会自动感知尺寸变化，必须手动 resize 否则地图空白/无法交互。
@@ -1950,7 +2156,7 @@
             const mk = (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.25, metalness: 0.4, roughness: 0.4 });
             if (fac.type === 'elevator') {
                 const body = new THREE.Mesh(new THREE.BoxGeometry(8, 18, 8), mk(0x6fb1ff)); g.add(body);
-                const top = new THREE.Mesh(new THREE.BoxGeometry(9, 2, 9), mk(0x00d4ff)); top.position.y = 10; g.add(top);
+                const top = new THREE.Mesh(new THREE.BoxGeometry(9, 2, 9), mk(0x2b6cff)); top.position.y = 10; g.add(top);
             } else if (fac.type === 'escalator') {
                 for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 14), mk(0x9fe8ff)); s.position.set(0, i * 6, 0); s.rotation.x = 0.25; g.add(s); }
             } else if (fac.type === 'stairs') {
@@ -2012,7 +2218,7 @@
             const dir = new THREE.DirectionalLight(0xbfe9ff, 0.9);
             dir.position.set(120, 320, 160);
             scene.add(dir);
-            const glow = new THREE.PointLight(0x00d4ff, 0.6, 700);
+            const glow = new THREE.PointLight(0x2b6cff, 0.6, 700);
             glow.position.set(0, FH * floorsData.length, 0);
             scene.add(glow);
 
@@ -2160,7 +2366,7 @@
                 if (fi === floorsData.length - 1) {
                     const re = new THREE.LineSegments(
                         new THREE.EdgesGeometry(new THREE.ExtrudeGeometry(shapeFromFootprint(fp), { depth: wallH, bevelEnabled: false })),
-                        new THREE.LineBasicMaterial({ color: 0x00d4ff })
+                        new THREE.LineBasicMaterial({ color: 0x2b6cff })
                     );
                     re.rotation.x = -Math.PI / 2;
                     re.position.y = -FH / 2 + 1;
@@ -2356,6 +2562,12 @@
                     const dx = e.clientX - downPos[0], dy = e.clientY - downPos[1];
                     const moved = dx * dx + dy * dy > 36; // 超过阈值视为旋转视角
                     downPos = null;
+                    if (locateMode) { // 定位模式：点击地面落点
+                        if (moved) return;
+                        const hit = groundHit(e);
+                        if (hit) placeMyLocation(hit.x, hit.z);
+                        return;
+                    }
                     if (editMode === 'shop') {
                         if (editDrag) { commitShopDrag(); return; }
                         if (!moved) { const hits = screenToMeshes(e, floorShops(), false); if (hits.length) selectShop(hits[0].object.userData.shop); }
@@ -2509,6 +2721,7 @@
                     fl.shops.forEach(s => { if (s.label) s.label.visible = (i === indoor.current); }); // 仅当前层显示标签
                 });
                 controls.target.y = indoor.current * FH;
+                updateMyPosVisibility(); // 「我的位置」标记仅在本层显示
             }
             function render3DFloorCtrl() {
                 const ctrl = document.getElementById('hudFloorCtrl');
@@ -2555,7 +2768,15 @@
                     indoor.nav = null;
                 }
                 const box = document.getElementById('hudNavSteps');
-                if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+                if (box) { box.innerHTML = ''; }
+                const navBox = document.getElementById('hudNavBox');
+                if (navBox) navBox.style.display = 'none';
+            }
+
+            // 折叠 / 展开导航浮层（仅隐藏步骤列表，标题栏保留）
+            function toggleNavBox() {
+                const navBox = document.getElementById('hudNavBox');
+                if (navBox) navBox.classList.toggle('collapsed');
             }
 
             // 开始导航：从正门入口经中央走道到目标店铺，绘制发光路径 + 移动标记
@@ -2573,13 +2794,65 @@
                 const bb = fl.bbox;
                 const cxc = (bb.minX + bb.maxX) / 2, czc = (bb.minZ + bb.maxZ) / 2; // 本层中心（中庭）
                 const entranceZ = bb.maxZ - 4;             // 正门入口（本层 +Z 边）
-                const pts = [
-                    new THREE.Vector3(cxc, FH * 0.45, entranceZ),               // 正门入口
-                    new THREE.Vector3(cxc, FH * 0.45, czc),                     // 中庭
-                ];
-                if (fi > 0) pts.push(new THREE.Vector3(cxc, fi * FH + fh, czc));   // 垂直上至目标层中庭
-                pts.push(new THREE.Vector3(entry.world.x, fi * FH + fh, czc));  // 沿中央走道到目标列
-                pts.push(new THREE.Vector3(entry.world.x, fi * FH + fh, entry.world.z)); // 到店铺前
+
+                // 起点层：若已标记「我的位置」则从该位置所在层出发；否则从正门入口（1 层）出发
+                const fromMyPos = !!myPosData;
+                const sf = fromMyPos ? myPosData.floor : 0;        // 源层索引
+                const sx = fromMyPos ? myPosData.x : cxc;
+                const sz = fromMyPos ? myPosData.z : entranceZ;
+                const srcDisp = (floorData[sf] && floorData[sf].display) || ('F' + sf);
+                const yAt = (k) => k * FH + fh;
+
+                // 某层的竖向交通设施（电梯 / 扶梯 / 楼梯）地面坐标
+                const vertFacs = (k) => floors[k].group.children
+                    .filter(o => o.userData && o.userData.kind === 'facility' &&
+                        ['elevator', 'escalator', 'stairs'].indexOf(o.userData.fac.type) >= 0)
+                    .map(o => ({ type: o.userData.fac.type, x: o.position.x, z: o.position.z }));
+
+                const pts = [];
+                let usedVert = null;  // 实际经过的竖向通道类型
+                if (sf === fi) {
+                    // 同层：起点 -> 中庭走廊 -> 目标列 -> 店铺前
+                    pts.push(new THREE.Vector3(sx, yAt(sf), sz));
+                    pts.push(new THREE.Vector3(cxc, yAt(sf), czc));
+                    pts.push(new THREE.Vector3(entry.world.x, yAt(fi), czc));
+                    pts.push(new THREE.Vector3(entry.world.x, yAt(fi), entry.world.z));
+                } else {
+                    const sFacs = vertFacs(sf), tFacs = vertFacs(fi);
+                    let chosen = null;
+                    if (sFacs.length && tFacs.length) {
+                        // 优先选两层共位（x,z 接近）且离起点最近的设施
+                        let bestD = Infinity;
+                        for (const s of sFacs) for (const t of tFacs) {
+                            if (Math.hypot(s.x - t.x, s.z - t.z) < 12) {
+                                const d = Math.hypot(s.x - sx, s.z - sz);
+                                if (d < bestD) { bestD = d; chosen = { s, t }; }
+                            }
+                        }
+                        // 退而求其次：源层取离起点最近，目标层取投影最近
+                        if (!chosen) {
+                            let sB = null, sd = Infinity; for (const s of sFacs) { const d = Math.hypot(s.x - sx, s.z - sz); if (d < sd) { sd = d; sB = s; } }
+                            let tB = null, td = Infinity; for (const t of tFacs) { const d = Math.hypot(t.x - sB.x, t.z - sB.z); if (d < td) { td = d; tB = t; } }
+                            chosen = { s: sB, t: tB };
+                        }
+                    }
+                    if (chosen) {
+                        usedVert = chosen.s.type; // 经过真实电梯/扶梯/楼梯
+                        pts.push(new THREE.Vector3(sx, yAt(sf), sz));                     // 起点
+                        pts.push(new THREE.Vector3(chosen.s.x, yAt(sf), chosen.s.z));     // 到源层竖向设施
+                        pts.push(new THREE.Vector3(chosen.t.x, yAt(fi), chosen.t.z));     // 竖向直达目标层同设施
+                        pts.push(new THREE.Vector3(entry.world.x, yAt(fi), czc));         // 沿走廊到目标列
+                        pts.push(new THREE.Vector3(entry.world.x, yAt(fi), entry.world.z)); // 到店铺前
+                    } else {
+                        // 无电梯/扶梯/楼梯：兜底走中庭竖向（仅在缺少竖向设施时启用）
+                        usedVert = 'atrium';
+                        pts.push(new THREE.Vector3(sx, yAt(sf), sz));
+                        pts.push(new THREE.Vector3(cxc, yAt(sf), czc));
+                        pts.push(new THREE.Vector3(cxc, yAt(fi), czc));
+                        pts.push(new THREE.Vector3(entry.world.x, yAt(fi), czc));
+                        pts.push(new THREE.Vector3(entry.world.x, yAt(fi), entry.world.z));
+                    }
+                }
 
                 const curve = new THREE.CatmullRomCurve3(pts);
                 const tube = new THREE.Mesh(
@@ -2606,19 +2879,32 @@
                 // 步骤文本
                 const flDisp = floors[fi].data.display;
                 const catL = CAT_META[target.cat].label;
-                const steps = ['从正门入口进入商场（1 层）', '沿中央步行街直行至中庭'];
-                if (fi > 0) steps.push('经中庭扶梯上至 ' + flDisp + ' 层中庭');
+                const vertLabel = { elevator: '电梯', escalator: '扶梯', stairs: '楼梯', atrium: '中庭竖向通道' }[usedVert] || '垂直通道';
+                const steps = [];
+                steps.push(fromMyPos ? ('从「我的位置」（' + srcDisp + '）出发') : ('从正门入口进入商场（' + srcDisp + '）'));
+                if (sf === fi) {
+                    steps.push('沿中央步行街直行至中庭');
+                } else if (usedVert && usedVert !== 'atrium') {
+                    steps.push('前往 ' + srcDisp + ' 的' + vertLabel + '位置');
+                    steps.push('乘坐' + vertLabel + '前往 ' + flDisp);
+                    steps.push('出' + vertLabel + '后沿走廊前往目标');
+                } else {
+                    steps.push('沿中央步行街直行至 ' + srcDisp + ' 中庭');
+                    steps.push('经' + vertLabel + '前往 ' + flDisp);
+                }
                 steps.push('沿中央走道前往「' + target.name + '」前（' + flDisp + ' · ' + catL + '）');
 
                 const box = document.getElementById('hudNavSteps');
-                box.innerHTML = '<div class="ns-title">🧭 导航路线（至 ' + target.name + '）</div><ol>' +
-                    steps.map(s => '<li>' + s + '</li>').join('') + '</ol>';
+                const navTitle = document.getElementById('hudNavTitle');
+                if (navTitle) navTitle.textContent = '导航至「' + target.name + '」';
+                box.innerHTML = '<ol>' + steps.map(s => '<li>' + s + '</li>').join('') + '</ol>';
                 const stopBtn = document.createElement('button');
                 stopBtn.className = 'nav-stop';
                 stopBtn.textContent = '✕ 停止导航';
                 stopBtn.onclick = stopNavigation;
                 box.appendChild(stopBtn);
-                box.style.display = 'block';
+                const navBox = document.getElementById('hudNavBox');
+                if (navBox) { navBox.style.display = 'block'; navBox.classList.remove('collapsed'); }
 
                 indoor.nav = { curve, tube, marker, endCap, progress: 0, target: target, floor: fi };
                 updateStatus('已开始导航：' + target.name, 'success');
@@ -2637,6 +2923,10 @@
                 if (indoor.nav && indoor.nav.marker && indoor.nav.curve) {
                     indoor.nav.progress = Math.min(1, indoor.nav.progress + 0.004);
                     indoor.nav.marker.position.copy(indoor.nav.curve.getPointAt(indoor.nav.progress));
+                }
+                if (indoor.myPosMarker && indoor.myPosMarker.visible) {
+                    const ps = 1 + Math.sin(performance.now() * 0.004) * 0.12; // 轻微呼吸脉冲
+                    indoor.myPosMarker.scale.x = ps; indoor.myPosMarker.scale.z = ps;
                 }
                 renderer.render(scene, camera);
                 labelRenderer.render(scene, camera);
@@ -2662,6 +2952,10 @@
 
             const navBtn = document.getElementById('hudNavBtn');
             if (navBtn) navBtn.onclick = startNavigation;
+            const locBtn = document.getElementById('hudLocateBtn');
+            if (locBtn) locBtn.onclick = startLocateMyPos;
+            // 若重建前已标记过「我的位置」，恢复其 3D 标记
+            rebuildMyPosMarker();
 
             applyFloorVisibility();
             render3DFloorCtrl();
@@ -2697,9 +2991,85 @@
             indoor = {
                 active: false, scene: null, camera: null, renderer: null, labelRenderer: null,
                 controls: null, raycaster: null, mouse: null, floors: [], current: 0,
-                selected: null, nav: null, switchFloor: null, animId: null,
+                selected: null, nav: null, switchFloor: null, animId: null, myPosMarker: null,
                 _onMove: null, _onClick: null, _onResize: null
             };
+        }
+
+        // ===== 我的位置（坐标定位）+ 从我位置出发的路径 =====
+        // 进入/退出「标记我的位置」定位模式：开启后点击地面落点
+        function startLocateMyPos() {
+            if (!indoor.active) return;
+            locateMode = !locateMode;
+            const btn = document.getElementById('hudLocateBtn');
+            if (btn) btn.classList.toggle('active', locateMode);
+            if (locateMode) {
+                if (indoor.controls) indoor.controls.enabled = true;
+                updateStatus('定位模式：点击地面标记「我的位置」（当前层 ' + curFloorName() + '）', 'loading');
+            } else {
+                updateStatus('已退出定位模式', 'loading');
+            }
+        }
+        // 在地面落点创建「我的位置」标记（x,z 为当前层地面坐标）
+        function placeMyLocation(x, z) {
+            if (!indoor.scene) return;
+            const fi = indoor.current;
+            const gy = fi * indoorConfig.FH - indoorConfig.FH / 2 + 1; // 楼板顶面
+            if (indoor.myPosMarker) indoor.scene.remove(indoor.myPosMarker);
+            const grp = new THREE.Group();
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(4, 6, 28),
+                new THREE.MeshBasicMaterial({ color: 0xffd166, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+            );
+            ring.rotation.x = -Math.PI / 2; ring.position.y = gy + 0.2;
+            grp.add(ring);
+            const pin = new THREE.Mesh(
+                new THREE.ConeGeometry(3, 9, 18),
+                new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xff9f43, emissiveIntensity: 0.6 })
+            );
+            pin.rotation.x = Math.PI; pin.position.y = gy + 7; // 尖朝下
+            grp.add(pin);
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(2.6, 16, 16),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffd166, emissiveIntensity: 0.9 })
+            );
+            head.position.y = gy + 12.5;
+            grp.add(head);
+            grp.position.set(x, 0, z);
+            grp.userData.kind = 'mypos';
+            indoor.scene.add(grp);
+            indoor.myPosMarker = grp;
+            myPosData = { x: +x.toFixed(1), z: +z.toFixed(1), floor: fi };
+            const panel = document.getElementById('hudMyPos');
+            if (panel) {
+                panel.style.display = 'block';
+                const fEl = document.getElementById('mpFloor'); if (fEl) fEl.textContent = (floorData[fi] && floorData[fi].display) || ('F' + fi);
+                const xEl = document.getElementById('mpX'); if (xEl) xEl.textContent = myPosData.x;
+                const zEl = document.getElementById('mpZ'); if (zEl) zEl.textContent = myPosData.z;
+            }
+            updateMyPosVisibility();
+            locateMode = false;
+            const b = document.getElementById('hudLocateBtn'); if (b) b.classList.remove('active');
+            updateStatus('已标记「我的位置」：层 ' + ((floorData[fi] && floorData[fi].display) || ('F' + fi)) + '，坐标 (X ' + myPosData.x + ', Z ' + myPosData.z + ')', 'success');
+        }
+        // 重建后（场景销毁）依据 myPosData 重新生成标记
+        function rebuildMyPosMarker() {
+            if (!myPosData || !indoor.scene || !indoor.active) return;
+            placeMyLocation(myPosData.x, myPosData.z);
+        }
+        // 根据当前层控制标记可见性（随楼层切换隐藏/显示）
+        function updateMyPosVisibility() {
+            if (indoor.myPosMarker) indoor.myPosMarker.visible = !!(myPosData && myPosData.floor === indoor.current);
+        }
+        // 清除「我的位置」
+        function clearMyLocation() {
+            if (indoor.myPosMarker && indoor.scene) indoor.scene.remove(indoor.myPosMarker);
+            indoor.myPosMarker = null;
+            myPosData = null;
+            locateMode = false;
+            const b = document.getElementById('hudLocateBtn'); if (b) b.classList.remove('active');
+            const panel = document.getElementById('hudMyPos'); if (panel) panel.style.display = 'none';
+            updateStatus('已清除定位', 'loading');
         }
 
         // ===== 室内 3D 建模自定义（全局面板控制） =====
@@ -2712,7 +3082,7 @@
             p.classList.toggle('open');
             if (opening) {
                 syncCustomPanel();
-                // 温和引导：仅高亮「📖 教程」按钮提示，不弹出遮罩（避免遮挡 3D 编辑交互）
+                // 温和引导：仅高亮「教程」按钮提示，不弹出遮罩（避免遮挡 3D 编辑交互）
                 try {
                     if (!localStorage.getItem('mallTutSeen')) {
                         const btn = document.getElementById('customBtn');
@@ -2737,6 +3107,16 @@
             const a = document.getElementById('cfgAtrium'); if (a) a.checked = (typeof fc.atrium === 'boolean') ? fc.atrium : indoorConfig.atrium;
             const l = document.getElementById('cfgLabels'); if (l) l.checked = indoorConfig.labels;
             const r = document.getElementById('cfgRotate'); if (r) r.checked = indoorConfig.autoRotate;
+            // 楼层设置：根据当前 floorData 反推地上/地下层数回填
+            let above = 0, below = 0;
+            floorData.forEach(f => {
+                const m = String(f.name).toUpperCase().match(/B(\d+)/);
+                if (m) below = Math.max(below, parseInt(m[1], 10));
+                else { const n = String(f.name).match(/(\d+)/); if (n) above = Math.max(above, parseInt(n[1], 10)); }
+            });
+            if (above + below < 1) { above = 1; below = 0; }
+            set('cfgAbove', 'valAbove', above);
+            set('cfgBelow', 'valBelow', below);
             const fl = document.getElementById('cpEditFloor'); if (fl) fl.textContent = fName;
             const hint = document.getElementById('cpFootprintHint');
             if (hint) {
@@ -2752,6 +3132,7 @@
                     if (el) el.addEventListener('input', () => { if (sp) sp.textContent = el.value; });
                 };
                 live('cfgW', 'valW'); live('cfgD', 'valD'); live('cfgFH', 'valFH'); live('cfgCOLS', 'valCOLS'); live('cfgROWS', 'valROWS');
+                live('cfgAbove', 'valAbove'); live('cfgBelow', 'valBelow');
                 const rot = document.getElementById('cfgRotate');
                 if (rot) rot.addEventListener('change', () => { indoorConfig.autoRotate = rot.checked; if (indoor.controls) indoor.controls.autoRotate = rot.checked; });
             }
@@ -2785,12 +3166,14 @@
         }
         function rebuildIndoor() {
             if (!indoor.active) return;
-            const name = indoor.mallName || (currentBuildingInfo && currentBuildingInfo.name) || '商场';
+            const name = indoor.mallName || (currentBuildingInfo && currentBuildingInfo.name) || '建筑';
             const keep = indoor.current || 0;
             const selId = editSelShopId;   // 保存当前选中店铺，重建后恢复（避免调整形状/尺寸/颜色后丢失选中）
             const em = editMode;           // 保存当前编辑模式，重建后恢复
             const ns = document.getElementById('hudNavSteps');
-            if (ns) { ns.style.display = 'none'; ns.innerHTML = ''; }
+            if (ns) ns.innerHTML = '';
+            const navBox = document.getElementById('hudNavBox');
+            if (navBox) navBox.style.display = 'none';
             disposeIndoor();
             const ld = document.getElementById('indoorLoading');
             if (ld) ld.style.display = 'flex';
@@ -2927,8 +3310,8 @@
             if (hint) {
                 hint.classList.add('enh');
                 const enh = {
-                    '': '👁 <b>浏览模式</b>：拖拽旋转 · 滚轮缩放 · 悬停查看 · 点击选中店铺。',
-                    'wall': '🧱 <b>加内墙</b>：在地面依次点两点连一段墙，可继续添加。<span class="next">下一步：点击已有墙可删除，或用「撤销一段 / 清空本层」。</span>',
+                    '': '<b>浏览模式</b>：拖拽旋转 · 滚轮缩放 · 悬停查看 · 点击选中店铺。',
+                    'wall': '<b>加内墙</b>：在地面依次点两点连一段墙，可继续添加。<span class="next">下一步：点击已有墙可删除，或用「撤销一段 / 清空本层」。</span>',
                     'shop': '🏬 <b>编辑店铺</b>：点选后<b>按住拖动</b>移动；右侧改色 / 新增 / 删除 / 复位。<span class="next">下一步：试试把店铺改成餐饮色 🟧。</span>',
                     'facility': '🛗 <b>放设施</b>：选类型后在地面点击放置；点击已有设施可删除。<span class="next">下一步：切换楼层后设施按层独立保存。</span>'
                 };
@@ -3092,9 +3475,9 @@
             updateStatus('已清空本层内墙', 'success');
             rebuildIndoor();
         }
-        // 一键清空商场内全部建模（店铺/内墙/设施/轮廓），便于从头设计
+        // 一键清空建筑内全部建模（店铺/内墙/设施/轮廓），便于从头设计
         function clearAllModeling() {
-            if (!window.confirm('确定要清空商场内所有建模吗？\n将删除全部楼层的店铺、内墙、设施与轮廓，且不可撤销。')) return;
+            if (!window.confirm('确定要清空建筑内所有建模吗？\n将删除全部楼层的店铺、内墙、设施与轮廓，且不可撤销。')) return;
             // cleared 标记：清空后不再自动生成默认/真实店铺网格，只保留空楼体壳，真正从零设计
             indoorEdit = { floors: {}, cleared: true };
             indoorConfig.footprint = null; // 整栋轮廓复位为矩形
@@ -3125,6 +3508,15 @@
         // 打开 / 关闭数据模态框
         function openDataModal() { const m = document.getElementById('dataModal'); if (m) m.classList.add('show'); }
         function closeDataModal() { const m = document.getElementById('dataModal'); if (m) m.classList.remove('show'); }
+        // 清空文本框与提示，便于快速换一份数据重新测试
+        function clearDataText() {
+            const ta = document.getElementById('dataText');
+            const msg = document.getElementById('dataMsg');
+            const fi = document.getElementById('dataFile');
+            if (ta) ta.value = '';
+            if (fi) fi.value = '';
+            if (msg) { msg.textContent = ''; msg.className = 'data-msg'; }
+        }
 
         // 选择文件后读入文本框
         function handleDataFile(input) {
@@ -3154,7 +3546,7 @@
             catch (e) { if (msg) { msg.textContent = 'JSON 解析失败：' + e.message; msg.className = 'data-msg err'; } return; }
             try {
                 applyUploadedData(data);
-                if (msg) { msg.textContent = '载入成功！已按数据生成建模。'; msg.className = 'data-msg ok'; }
+                if (msg) { msg.textContent = '载入成功！弹窗保持打开，可换一份数据继续「载入并生成建模」反复测试；点「取消 / ✕」关闭查看 3D。'; msg.className = 'data-msg ok'; }
             } catch (e) {
                 if (msg) { msg.textContent = '数据校验失败：' + e.message; msg.className = 'data-msg err'; }
             }
@@ -3175,6 +3567,8 @@
 
             const floorsIn = Array.isArray(data.floors) ? data.floors : [];
             if (!floorsIn.length) throw new Error('数据至少应包含 1 个楼层（floors 数组非空）');
+            // 按楼层排序键升序：地下层(B)排在最前 → 3D 中位于底层，避免 B 层被错放到最上方
+            floorsIn.sort((a, b) => floorSortKey(a.name || 'L1') - floorSortKey(b.name || 'L1'));
 
             const usedNames = {};
             floorData = floorsIn.map((fl, i) => {
@@ -3227,7 +3621,7 @@
 
             // 保证能进入 3D（未选商场时也能直接载入）
             currentBuildingInfo = currentBuildingInfo || {};
-            currentBuildingInfo.name = b.name || (currentBuildingInfo && currentBuildingInfo.name) || '自定义商场';
+            currentBuildingInfo.name = b.name || (currentBuildingInfo && currentBuildingInfo.name) || '自定义建筑';
             currentBuildingInfo.address = b.address || (currentBuildingInfo && currentBuildingInfo.address) || '';
             if (!currentBuilding) currentBuilding = '__uploaded__';
 
@@ -3237,16 +3631,16 @@
                 if (typeof renderFloorList === 'function') renderFloorList();
                 if (typeof renderMapFloorControl === 'function') renderMapFloorControl();
             } else {
-                enterMall();
+                enterBuilding();
             }
-            closeDataModal();
+            // 注意：载入成功后【不关闭】弹窗，便于连续导入多份数据反复测试（点「取消 / ✕」才关闭）
             updateStatus('已按数据生成建模：' + floorData.length + ' 层 / ' + totalShops + ' 店铺 / ' + totalWalls + ' 墙 / ' + totalFacs + ' 设施', 'success');
         }
 
         // 下载数据模板
         function downloadTemplate() {
             const tpl = {
-                building: { name: '示例商场', address: '', W: 140, D: 100, FH: 20, COLS: 8, ROWS: 6, atrium: true, labels: true, footprint: null },
+                building: { name: '示例建筑', address: '', W: 140, D: 100, FH: 20, COLS: 8, ROWS: 6, atrium: true, labels: true, footprint: null },
                 floors: [
                     {
                         name: 'L1', display: '1层', type: 'shopping', desc: '购物', COLS: 8, ROWS: 6,
@@ -3302,7 +3696,7 @@
                 floors.push({ name: 'L' + (i + 1), display: (i + 1) + '层', type: type, desc: '随机生成', COLS: COLS, ROWS: ROWS, shops: shops, facilities: facilities, walls: walls });
             }
             return {
-                building: { name: '随机样例商场 ' + new Date().toLocaleDateString(), address: '', W: W, D: D, FH: FH, COLS: floors[0].COLS, ROWS: floors[0].ROWS, atrium: true, labels: true, footprint: null },
+                building: { name: '随机样例建筑 ' + new Date().toLocaleDateString(), address: '', W: W, D: D, FH: FH, COLS: floors[0].COLS, ROWS: floors[0].ROWS, atrium: true, labels: true, footprint: null },
                 floors: floors
             };
         }
@@ -3315,7 +3709,7 @@
             const msg = document.getElementById('dataMsg');
             try {
                 applyUploadedData(data);
-                if (msg) { msg.textContent = '已生成随机样例并载入（' + data.floors.length + ' 层）'; msg.className = 'data-msg ok'; }
+                if (msg) { msg.textContent = '已生成随机样例并载入（' + data.floors.length + ' 层）。弹窗保持打开，可再点「随机样例」或换数据继续测试；点「取消 / ✕」关闭查看 3D。'; msg.className = 'data-msg ok'; }
             } catch (e) {
                 if (msg) { msg.textContent = '生成失败：' + e.message; msg.className = 'data-msg err'; }
             }
@@ -3328,15 +3722,15 @@
 
         // ===== 教程与快速开始（自定义建模易用性增强） =====
         const TUT_STEPS = [
-            { n: '进入自定义建模', body: '点击顶部 <b>📖 教程</b> 或 <b>⚙ 自定义</b> 打开右侧建模面板。若尚未进入 3D 漫游，请先在室外地图点击 <b>商场标注</b> 进入室内模式。' },
+            { n: '进入自定义建模', body: '点击顶部 <b>教程</b> 或 <b>自定义</b> 打开右侧建模面板。若尚未进入 3D 漫游，请先在室外地图点击 <b>建筑标注</b> 进入室内模式。' },
             { n: '调整整体尺寸', body: '拖动 <b>建筑宽度 / 深度 / 楼层高度 / 店铺网格</b> 滑块，点 <code>应用并重建</code> 即可改变整栋外形与店铺数量。' },
-            { n: '加内墙隔断', body: '点 <b>🧱 加内墙</b>，在地面依次点击 <b>两点</b> 连成一段墙，可继续添加。<b>点击已有墙</b> 可删除，或用「撤销一段 / 清空本层」。' },
+            { n: '加内墙隔断', body: '点 <b>加内墙</b>，在地面依次点击 <b>两点</b> 连成一段墙，可继续添加。<b>点击已有墙</b> 可删除，或用「撤销一段 / 清空本层」。' },
             { n: '编辑店铺', body: '点 <b>🏬 编辑店铺</b>，点选一个店铺后 <b>按住拖动</b> 可移动；右侧选 4 种颜色改品类，或 <b>新增 / 删除 / 复位</b>。' },
             { n: '放置设施', body: '点 <b>🛗 放设施</b>，选好类型（电梯/扶梯/楼梯/喷泉）后在地面点击放置；<b>点击已有设施</b> 可删除。' },
-            { n: '自由绘制轮廓', body: '点 <b>✏️ 整栋轮廓</b> 或 <b>✏️ 本层轮廓</b>，在地面点击 <b>≥3 个角点</b> 连成闭合多边形，再点 <b>✅ 完成轮廓</b> 改变建筑外形（店铺按轮廓裁剪）。' },
+            { n: '自由绘制轮廓', body: '点 <b>整栋轮廓</b> 或 <b>本层轮廓</b>，在地面点击 <b>≥3 个角点</b> 连成闭合多边形，再点 <b>完成轮廓</b> 改变建筑外形（店铺按轮廓裁剪）。' },
             { n: '逐层独立编辑', body: '用右侧 <b>楼层控制器</b> 切换其他层，尺寸/网格/轮廓/店铺都 <b>按层独立保存</b>，互不影响。' },
-            { n: '实时查看与导航', body: '全部编辑实时反映在 3D 场景。切回 <b>👁 浏览</b> 模式，点击店铺查看详情并 <b>🧭 导航到这里</b>。' },
-            { n: '退出与保存', body: '编辑结果保存在本会话。点 <b>← 返回地图</b> 退出 3D；随时点顶部 <b>📖 教程</b> 回看本指南。' }
+            { n: '实时查看与导航', body: '全部编辑实时反映在 3D 场景。切回 <b>浏览</b> 模式，点击店铺查看详情并 <b>导航到这里</b>。' },
+            { n: '退出与保存', body: '编辑结果保存在本会话。点 <b>← 返回地图</b> 退出 3D；随时点顶部 <b>教程</b> 回看本指南。' }
         ];
         let _tutIdx = 0;
         function openTutorial() {
@@ -3390,7 +3784,7 @@
     <!-- 教程浮层 -->
     <div class="tut-overlay" id="tutOverlay" onclick="if(event.target===this)closeTutorial()">
         <div class="tut-box">
-            <div class="tut-title">📖 3D 建模自定义 · 新手教程</div>
+            <div class="tut-title">3D 建模自定义 · 新手教程</div>
             <div class="tut-progress"><i id="tutBar"></i></div>
             <div class="tut-step-n" id="tutStepN">第 1 / 9 步</div>
             <div class="tut-step-body" id="tutBody"></div>
@@ -3406,15 +3800,16 @@
     <div class="data-modal" id="dataModal">
         <div class="data-modal-box">
             <div class="data-modal-head">
-                <span>📥 上传室内数据生成建模</span>
+                <span>上传室内数据生成建模</span>
                 <button class="data-close" onclick="closeDataModal()">✕</button>
             </div>
             <div class="data-modal-body">
-                <p class="data-tip">支持 <code>.json</code> 文件或粘贴 JSON 文本。数据将<b>覆盖当前建模</b>，按楼层 / 店铺 / 墙 / 设施生成 3D 模型。也可点「🎲 随机样例」一键生成演示数据（基于随机数接口）。格式说明：<code>building</code> 含尺寸，<code>floors[]</code> 每层含 <code>shops/walls/facilities</code>。</p>
+                <p class="data-tip">支持 <code>.json</code> 文件或粘贴 JSON 文本。数据将<b>覆盖当前建模</b>，按楼层 / 店铺 / 墙 / 设施生成 3D 模型。也可点「随机样例」生成演示数据（基于随机数接口）。格式说明：<code>building</code> 含尺寸，<code>floors[]</code> 每层含 <code>shops/walls/facilities</code>。<b>载入成功后弹窗保持打开</b>，可直接换一份数据继续点「载入并生成建模」反复测试；点「取消 / ✕」关闭弹窗查看 3D 效果。</p>
                 <div class="data-row">
                     <label class="data-file-btn">选择 JSON 文件<input type="file" id="dataFile" accept=".json,application/json" onchange="handleDataFile(this)" style="display:none"></label>
-                    <button class="data-btn" onclick="downloadTemplate()">⬇ 下载模板</button>
-                    <button class="data-btn" onclick="loadRandomIndoorData()">🎲 随机样例</button>
+                    <button class="data-btn" onclick="downloadTemplate()">下载模板</button>
+                    <button class="data-btn" onclick="loadRandomIndoorData()">随机样例</button>
+                    <button class="data-btn" onclick="clearDataText()">清空</button>
                 </div>
                 <textarea id="dataText" class="data-text" placeholder="在此粘贴室内数据 JSON，或选择文件后自动填入…"></textarea>
                 <div class="data-msg" id="dataMsg"></div>
