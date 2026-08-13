@@ -492,6 +492,7 @@
             padding: 12px 14px; box-shadow: var(--hud-shadow);
         }
         .room-livebox .rl-title { font-size: 13px; font-weight: 700; color: #4ade80; margin-bottom: 8px; }
+        .room-livebox .rl-users { max-height: 140px; overflow-y: auto; margin-bottom: 4px; }
         .room-livebox .rl-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
         .room-livebox .rl-row span { color: var(--hud-text-2); }
         .room-livebox .rl-row b { color: #fff; font-variant-numeric: tabular-nums; }
@@ -3668,8 +3669,17 @@
         let roomModels = {};        // 房间内部数据（跨重建持久化）：{ items, walls }
         // 房间级 3D 独立页面状态（与建筑 3D 的 indoor 完全分离）
         let roomScene = { active:false, name:null, scene:null, camera:null, renderer:null, labelRenderer:null, controls:null, raycaster:null, animId:null, W:14, D:10, FH:6 };
-        // 房间内用户实时位置（小圆球 + 轨迹）：坐标为房间内相对坐标（米，房间中心为原点）
-        let roomLive = { points: [], current: null, marker: null, line: null, demo: null };
+        // 多用户实时位置：users 按 userId 分，各自独立小球 + 轨迹（房间内相对坐标，米，房间中心为原点）
+        // 颜色按用户出现顺序从色板取，保证同房间多人可区分
+        const ROOM_USER_COLORS = [
+            { ball: 0x4ade80, line: 0x4ade80 }, // 绿
+            { ball: 0x60a5fa, line: 0x60a5fa }, // 蓝
+            { ball: 0xfbbf24, line: 0xfbbf24 }, // 黄
+            { ball: 0xf472b6, line: 0xf472b6 }, // 粉
+            { ball: 0xfb923c, line: 0xfb923c }, // 橙
+            { ball: 0xa78bfa, line: 0xa78bfa }  // 紫
+        ];
+        let roomLive = { users: {}, order: [], demo: null };
 
         // 上传弹窗
         function openRoomDataModal() { const m = document.getElementById('roomDataModal'); if (m) m.classList.add('show'); }
@@ -3830,25 +3840,21 @@
                 m.rotation.y = -Math.atan2(wl.z2 - wl.z1, wl.x2 - wl.x1);
                 scene.add(m);
             });
-            // 用户位置：小圆球 + 轨迹（房间内相对坐标）
-            const ball = new THREE.Mesh(
-                new THREE.SphereGeometry(0.6, 16, 16),
-                new THREE.MeshStandardMaterial({ color: 0x4ade80, emissive: 0x22c55e, emissiveIntensity: 0.9 })
-            );
-            ball.position.set(0, 0.8, 0);
-            ball.userData.kind = 'roomball';
-            scene.add(ball);
             roomScene.scene = scene; roomScene.camera = camera; roomScene.renderer = renderer;
             roomScene.controls = controls; roomScene.W = W; roomScene.D = D; roomScene.FH = FH;
-            roomScene.liveMarker = ball;
-            rebuildRoomTrace();
+            // 恢复已存在的用户（进入/重建后小球与轨迹按 users 重建）
+            rebuildRoomUsers();
             function animateRoom() {
                 roomScene.animId = requestAnimationFrame(animateRoom);
                 controls.update();
-                if (roomScene.liveMarker && roomScene.liveMarker.visible) {
-                    const ps = 1 + Math.sin(performance.now() * 0.006) * 0.12;
-                    roomScene.liveMarker.scale.x = ps; roomScene.liveMarker.scale.y = ps; roomScene.liveMarker.scale.z = ps;
-                }
+                // 每个用户的小球各自做呼吸脉冲
+                Object.keys(roomLive.users).forEach(uid => {
+                    const u = roomLive.users[uid];
+                    if (u && u.marker && u.marker.visible) {
+                        const ps = 1 + Math.sin(performance.now() * 0.006 + (u.colorIdx || 0) * 0.7) * 0.12;
+                        u.marker.scale.x = ps; u.marker.scale.y = ps; u.marker.scale.z = ps;
+                    }
+                });
                 renderer.render(scene, camera);
             }
             animateRoom();
@@ -3857,58 +3863,124 @@
             if (rl) rl.style.display = 'none';
             updateStatus('已进入房间「' + name + '」3D 建模：' + (model.items || []).length + ' 件物品 / ' + (model.walls || []).length + ' 道内墙', 'success');
         }
-        // 依据 roomLive.points 重建房间内轨迹线
-        function rebuildRoomTrace() {
-            if (!roomScene.scene) return;
-            if (roomScene.liveLine) { roomScene.scene.remove(roomScene.liveLine); roomScene.liveLine = null; }
-            if (roomLive.points.length < 2) return;
-            const verts = roomLive.points.map(p => new THREE.Vector3(p.x, 0.9, p.z));
-            const geo = new THREE.BufferGeometry().setFromPoints(verts);
-            const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.85 }));
-            roomScene.scene.add(line);
-            roomScene.liveLine = line;
+        // 取（或建）某个用户的状态；新用户自动分配颜色
+        function roomUser(uid) {
+            uid = String(uid || 'u1');
+            if (!roomLive.users[uid]) {
+                const ci = roomLive.order.length % ROOM_USER_COLORS.length;
+                roomLive.order.push(uid);
+                roomLive.users[uid] = { points: [], current: null, marker: null, line: null, colorIdx: ci, color: ROOM_USER_COLORS[ci] };
+            }
+            return roomLive.users[uid];
         }
-        // 房间内用户位置更新（小圆球 + 轨迹）
-        function roomPush(x, z, ts) {
+        // 依据某用户的 points 重建其轨迹线
+        function rebuildRoomTrace(uid) {
+            if (!roomScene.scene) return;
+            const u = roomLive.users[uid];
+            if (!u) return;
+            if (u.line) { roomScene.scene.remove(u.line); u.line = null; }
+            if (u.points.length < 2) return;
+            const verts = u.points.map(p => new THREE.Vector3(p.x, 0.9, p.z));
+            const geo = new THREE.BufferGeometry().setFromPoints(verts);
+            const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: u.color.line, transparent: true, opacity: 0.85 }));
+            roomScene.scene.add(line);
+            u.line = line;
+        }
+        // 恢复所有用户的小球与轨迹（场景重建后调用）
+        function rebuildRoomUsers() {
+            if (!roomScene.scene) return;
+            Object.keys(roomLive.users).forEach(uid => {
+                const u = roomLive.users[uid];
+                if (u.marker) { roomScene.scene.remove(u.marker); u.marker = null; }
+                u.line = null;
+                if (u.current) {
+                    u.marker = roomBallMesh(u.color.ball);
+                    u.marker.position.set(u.current.x, 0.8, u.current.z);
+                    roomScene.scene.add(u.marker);
+                }
+                rebuildRoomTrace(uid);
+            });
+        }
+        // 小圆球（体积小）
+        function roomBallMesh(color) {
+            const m = new THREE.Mesh(
+                new THREE.SphereGeometry(0.6, 16, 16),
+                new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.9 })
+            );
+            m.userData.kind = 'roomball';
+            return m;
+        }
+        // 房间内用户位置更新（多用户：按 userId 区分，小圆球 + 轨迹）
+        function roomPush(uid, x, z, ts) {
             if (typeof x !== 'number' || typeof z !== 'number' || !isFinite(x) || !isFinite(z)) {
                 return { ok: false, msg: 'x/z 必须为数字' };
             }
+            const u = roomUser(uid);
             const pt = { x: +x.toFixed(2), z: +z.toFixed(2), ts: ts || Date.now() };
-            roomLive.points.push(pt);
-            if (roomLive.points.length > 2000) roomLive.points.splice(0, roomLive.points.length - 2000);
-            roomLive.current = pt;
-            if (roomScene.liveMarker) { roomScene.liveMarker.position.x = pt.x; roomScene.liveMarker.position.z = pt.z; }
-            rebuildRoomTrace();
-            const ex = document.getElementById('rlX'), ez = document.getElementById('rlZ'), et = document.getElementById('rlTs'), ec = document.getElementById('rlCount');
-            if (ex) ex.textContent = pt.x;
-            if (ez) ez.textContent = pt.z;
-            if (et) et.textContent = new Date(pt.ts).toLocaleTimeString();
-            if (ec) ec.textContent = roomLive.points.length;
-            return { ok: true, count: roomLive.points.length };
-        }
-        function roomClearLive() {
-            roomLive.points = []; roomLive.current = null;
-            if (roomScene.scene) {
-                if (roomScene.liveLine) { roomScene.scene.remove(roomScene.liveLine); roomScene.liveLine = null; }
+            u.points.push(pt);
+            if (u.points.length > 2000) u.points.splice(0, u.points.length - 2000);
+            u.current = pt;
+            // 懒创建小球（首次推送时）
+            if (!u.marker && roomScene.scene) {
+                u.marker = roomBallMesh(u.color.ball);
+                roomScene.scene.add(u.marker);
             }
-            const ex = document.getElementById('rlX'), ez = document.getElementById('rlZ'), et = document.getElementById('rlTs'), ec = document.getElementById('rlCount');
-            if (ex) ex.textContent = '—'; if (ez) ez.textContent = '—'; if (et) et.textContent = '—'; if (ec) ec.textContent = '0';
+            if (u.marker) { u.marker.position.x = pt.x; u.marker.position.z = pt.z; }
+            rebuildRoomTrace(uid);
+            renderRoomLivePanel();
+            return { ok: true, uid: String(uid || 'u1'), count: u.points.length };
+        }
+        // 刷新房间实时位置面板（用户列表）
+        function renderRoomLivePanel() {
+            const list = document.getElementById('rlUsers');
+            const total = document.getElementById('rlTotal');
+            if (total) total.textContent = roomLive.order.length;
+            if (!list) return;
+            let html = '';
+            roomLive.order.forEach(uid => {
+                const u = roomLive.users[uid];
+                const c = u && u.current;
+                const col = u ? u.color.ball : 0x4ade80;
+                html += `<div class="rl-row"><span style="display:inline-flex;align-items:center;gap:6px;"><i style="width:9px;height:9px;border-radius:50%;background:#${col.toString(16).padStart(6,'0')};display:inline-block;"></i>${uid}</span><b>${c ? (c.x + ', ' + c.z) : '—'}</b></div>`;
+            });
+            list.innerHTML = html || '<div class="rl-row"><span>暂无用户</span><b>—</b></div>';
+        }
+        function roomClearLive(uid) {
+            if (uid) {
+                const u = roomLive.users[String(uid)];
+                if (u) {
+                    u.points = []; u.current = null;
+                    if (roomScene.scene) {
+                        if (u.marker) { roomScene.scene.remove(u.marker); u.marker = null; }
+                        if (u.line) { roomScene.scene.remove(u.line); u.line = null; }
+                    }
+                }
+            } else {
+                Object.keys(roomLive.users).forEach(k => roomClearLive(k));
+            }
+            renderRoomLivePanel();
             updateStatus('已清除房间内轨迹', 'loading');
         }
-        // 房间内随机游走演示
+        // 房间内随机游走演示（多个用户同时游走）
         function roomDemo() {
             if (!roomScene.active) { updateStatus('请先进入房间 3D 模式', 'error'); return; }
             if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; }
             const W = roomScene.W / 2 - 1, D = roomScene.D / 2 - 1;
-            let x = (Math.random() - 0.5) * W, z = (Math.random() - 0.5) * D;
-            let dx = (Math.random() - 0.5) * 0.8, dz = (Math.random() - 0.5) * 0.8;
+            const uids = ['用户A', '用户B', '用户C'];
+            // 每人独立位置/速度
+            const walkers = uids.map(() => ({
+                x: (Math.random() - 0.5) * W, z: (Math.random() - 0.5) * D,
+                dx: (Math.random() - 0.5) * 0.8, dz: (Math.random() - 0.5) * 0.8
+            }));
             roomLive.demo = setInterval(() => {
-                dx += (Math.random() - 0.5) * 0.5; dz += (Math.random() - 0.5) * 0.5;
-                x = Math.max(-W, Math.min(W, x + dx)); z = Math.max(-D, Math.min(D, z + dz));
-                if (Math.abs(x) >= W || Math.abs(z) >= D) { dx = -dx * 0.5; dz = -dz * 0.5; }
-                roomPush(x, z);
+                walkers.forEach((w, i) => {
+                    w.dx += (Math.random() - 0.5) * 0.5; w.dz += (Math.random() - 0.5) * 0.5;
+                    w.x = Math.max(-W, Math.min(W, w.x + w.dx)); w.z = Math.max(-D, Math.min(D, w.z + w.dz));
+                    if (Math.abs(w.x) >= W || Math.abs(w.z) >= D) { w.dx = -w.dx * 0.5; w.dz = -w.dz * 0.5; }
+                    roomPush(uids[i], w.x, w.z);
+                });
             }, 400);
-            updateStatus('房间内随机游走演示已启动', 'loading');
+            updateStatus('房间内多用户随机游走演示已启动（3 人）', 'loading');
         }
         // 一键演示：载入随机房间数据并进入房间、启动小球游走
         function loadRoomDemo() {
@@ -3995,7 +4067,9 @@
             if (roomScene.renderer) roomScene.renderer.dispose();
             const cv = document.getElementById('roomCanvas');
             if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
-            roomScene = { active:false, name:null, scene:null, camera:null, renderer:null, labelRenderer:null, controls:null, raycaster:null, animId:null, W:14, D:10, FH:6, liveMarker:null, liveLine:null };
+            // 场景销毁：清掉各用户对旧场景的引用（数据 points/current 保留，重建后恢复）
+            Object.keys(roomLive.users).forEach(k => { const u = roomLive.users[k]; u.marker = null; u.line = null; });
+            roomScene = { active:false, name:null, scene:null, camera:null, renderer:null, labelRenderer:null, controls:null, raycaster:null, animId:null, W:14, D:10, FH:6 };
         }
         // 对外 API：房间建模数据上传 / 实时坐标 / 进入 / 退出
         window.IndoorRoomAPI = {
@@ -4019,9 +4093,16 @@
             clear(room) { delete roomModels[room]; if (roomScene.active && roomScene.name === room) { disposeRoomScene(); buildRoomScene(room); } return { ok: true }; },
             enter(room) { enterRoom3D(room); return { ok: true }; },
             exit() { exitRoom3D(); return { ok: true }; },
-            push(point) { if (!point || typeof point.x !== 'number' || typeof point.z !== 'number') return { ok: false, msg: '需要 {x, z}（房间内相对坐标）' }; return roomPush(point.x, point.z, point.ts); },
-            clearLive() { roomClearLive(); return { ok: true }; },
-            getState() { return { room: roomScene.active ? roomScene.name : null, count: roomLive.points.length, current: roomLive.current }; },
+            push(point) {
+                if (!point || typeof point.x !== 'number' || typeof point.z !== 'number') return { ok: false, msg: '需要 {id?, x, z}（房间内相对坐标，id 缺省 u1）' };
+                return roomPush(point.id, point.x, point.z, point.ts);
+            },
+            clearLive(uid) { roomClearLive(uid); return { ok: true }; },
+            getState() {
+                const users = {};
+                Object.keys(roomLive.users).forEach(k => { const u = roomLive.users[k]; users[k] = { count: u.points.length, current: u.current }; });
+                return { room: roomScene.active ? roomScene.name : null, online: roomLive.order.length, users: users };
+            },
             startDemo() { roomDemo(); return { ok: true }; },
             stopDemo() { if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; } return { ok: true }; }
         };
@@ -4788,19 +4869,18 @@
                 <button class="return-btn" onclick="exitRoom3D()">← 返回建筑</button>
             </div>
         </div>
-        <!-- 左下：实时位置（小圆球）面板 -->
+        <!-- 左下：实时位置（多用户小圆球）面板 -->
         <div class="hud room-livebox" id="roomLiveBox">
-            <div class="rl-title">用户实时位置（小圆球）</div>
-            <div class="rl-row"><span>X（房间内）</span><b id="rlX">—</b></div>
-            <div class="rl-row"><span>Z（房间内）</span><b id="rlZ">—</b></div>
-            <div class="rl-row"><span>更新时间</span><b id="rlTs">—</b></div>
-            <div class="rl-row"><span>轨迹点数</span><b id="rlCount">0</b></div>
+            <div class="rl-title">用户实时位置（小圆球） · 在线 <b id="rlTotal">0</b> 人</div>
+            <div class="rl-users" id="rlUsers">
+                <div class="rl-row"><span>暂无用户</span><b>—</b></div>
+            </div>
             <div class="rl-ctrl">
-                <button class="rl-btn" onclick="roomDemo()">随机游走演示</button>
-                <button class="rl-btn danger" onclick="roomClearLive()">清除轨迹</button>
+                <button class="rl-btn" onclick="roomDemo()">随机游走演示（3 人）</button>
+                <button class="rl-btn danger" onclick="roomClearLive()">清除全部轨迹</button>
             </div>
             <div style="margin-top:8px;font-size:11px;color:var(--hud-text-2);line-height:1.7;">
-                调用：<code>IndoorRoomAPI.push({x:1.5, z:-0.8})</code>（房间内相对坐标，米）
+                调用：<code>IndoorRoomAPI.push({id:'用户A', x:1.5, z:-0.8})</code>（id 缺省为 u1；同房间多用户各自独立轨迹）
             </div>
         </div>
     </div>
