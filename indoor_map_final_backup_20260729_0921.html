@@ -1097,9 +1097,14 @@
                     <input id="lbPollUrl" class="lb-input" placeholder="JSON 接口地址（可选，如 http://localhost:8080/pos）">
                     <button class="lb-btn" id="lbPollBtn" onclick="toggleLivePolling()">开始轮询</button>
                 </div>
+                <div class="lb-poll">
+                    <input id="lbBackendUrl" class="lb-input" placeholder="后端地址（http 轮询 / ws 推送，如 http://localhost:3000/live）">
+                    <button class="lb-btn" id="lbBackendBtn" onclick="toggleBackend()">连接后端</button>
+                </div>
                 <div class="lb-api">
                     JS 调用：<code>IndoorLiveAPI.push({room:'优衣库', x:2, z:-1, floor:'L1'})</code><br>
-                    房间内相对坐标（以房间中心为原点，米）；不传 x/z 落在房间中心；传 <code>abs:true</code> 则 x/z 为建筑场景坐标。数据格式：<code>{"room":"优衣库","x":2,"z":-1,"floor":"L1"}</code>
+                    数据格式：<code>{"x":10,"z":-5,"floor":"L1"}</code>（floor 也可用索引 0,1,2…）<br>
+                    后端返回：<code>{"positions":[{"id":"u1","x":1,"z":2,"room":"优衣库"}]}</code> 或单条；带 room 走房间轨迹
                 </div>
             </div>
         </div>
@@ -2257,9 +2262,10 @@
             if (ns) ns.innerHTML = '';
             const navBox = document.getElementById('hudNavBox');
             if (navBox) navBox.style.display = 'none';
-            // 退出 3D 时停止实时位置演示/轮询定时器（轨迹数据保留，重新进入后自动恢复显示）
+            // 退出 3D 时停止实时位置演示/轮询/后端连接定时器（轨迹数据保留，重新进入后自动恢复显示）
             stopLiveDemo();
             stopLivePolling();
+            disconnectBackend();
             overlay.classList.remove('show');
             setTimeout(() => {
                 overlay.classList.remove('active');
@@ -3591,6 +3597,207 @@
         function stopLiveDemo() {
             if (liveState.demoTimer) { clearInterval(liveState.demoTimer); liveState.demoTimer = null; }
         }
+
+        // ===== 后端对接层：把后端(HTTP/WS)的数据统一接入前端 =====
+        // 后端就绪后只需填 LIVE_BACKEND 并调用 connectBackend()，或在前端面板填地址点「连接后端」
+        // 约定数据格式（后端按此返回）：
+        //   单条：{ id?, x, z, floor?, room?, ts?, abs? }
+        //   多条：{ positions: [...] } 或 [ ... ]
+        //   带 room → 房间级实时轨迹(roomPush)；不带 → 建筑级实时轨迹(pushLivePoint)
+        //   id：用户标识（不传则默认 u1）；abs=true 时 x/z 为建筑场景坐标，否则为房间内相对坐标
+        const LIVE_BACKEND = {
+            enabled: false,   // 默认关；面板点「连接后端」或 connectBackend() 后置 true
+            url: '',          // http(s)://... 走轮询；ws(s)://... 走 WebSocket
+            interval: 2000,   // HTTP 轮询间隔
+            ws: null,         // WebSocket 实例（运行时）
+            wsTimer: null,    // 断线重连定时器
+            httpTimer: null,  // HTTP 轮询定时器
+            httpAbort: null   // 当前 fetch 的 AbortController（避免重叠请求）
+        };
+        // 统一入口：解析后端下发的数据并分流
+        function ingestLiveData(payload) {
+            let list = [];
+            if (Array.isArray(payload)) list = payload;
+            else if (payload && Array.isArray(payload.positions)) list = payload.positions;
+            else if (payload && typeof payload === 'object' && typeof payload.x === 'number') list = [payload];
+            if (!list.length) return 0;
+            let n = 0;
+            list.forEach(p => {
+                if (!p || typeof p.x !== 'number' || typeof p.z !== 'number') return;
+                const id = p.id || 'u1';
+                if (p.room) roomPush(id, p.x, p.z, p.ts);        // 房间级
+                else pushLivePoint(p.x, p.z, p.floor, p.ts, p.room, p.abs); // 建筑级
+                n++;
+            });
+            return n;
+        }
+        // HTTP 轮询后端：GET url 拿 JSON
+        function backendHttpTick() {
+            const url = LIVE_BACKEND.url;
+            if (!url || !LIVE_BACKEND.enabled) return;
+            if (LIVE_BACKEND.httpAbort) LIVE_BACKEND.httpAbort.abort();
+            const ac = new AbortController();
+            LIVE_BACKEND.httpAbort = ac;
+            fetch(url, { signal: ac.signal })
+                .then(r => r.json())
+                .then(data => { ingestLiveData(data); })
+                .catch(() => { /* 网络抖动静默，下一轮重试 */ });
+        }
+        function startBackendHttp() {
+            stopBackendHttp();
+            LIVE_BACKEND.httpTimer = setInterval(backendHttpTick, LIVE_BACKEND.interval);
+            backendHttpTick();
+            updateStatus('后端已连接（HTTP 轮询）：' + LIVE_BACKEND.url, 'success');
+        }
+        function stopBackendHttp() {
+            if (LIVE_BACKEND.httpTimer) { clearInterval(LIVE_BACKEND.httpTimer); LIVE_BACKEND.httpTimer = null; }
+            if (LIVE_BACKEND.httpAbort) { LIVE_BACKEND.httpAbort.abort(); LIVE_BACKEND.httpAbort = null; }
+        }
+        // WebSocket 后端：实时推送，断线 3s 自动重连
+        function startBackendWs() {
+            stopBackendWs();
+            let ws;
+            try { ws = new WebSocket(LIVE_BACKEND.url); } catch (e) { updateStatus('WebSocket 地址不合法：' + LIVE_BACKEND.url, 'error'); return; }
+            LIVE_BACKEND.ws = ws;
+            ws.onopen = () => updateStatus('后端已连接（WebSocket）：' + LIVE_BACKEND.url, 'success');
+            ws.onmessage = (ev) => {
+                try { ingestLiveData(JSON.parse(ev.data)); } catch (e) { /* 非 JSON 消息忽略 */ }
+            };
+            ws.onclose = () => {
+                if (!LIVE_BACKEND.enabled) return;
+                updateStatus('后端连接断开，3 秒后重连…', 'loading');
+                LIVE_BACKEND.wsTimer = setTimeout(() => { if (LIVE_BACKEND.enabled) startBackendWs(); }, 3000);
+            };
+            ws.onerror = () => { try { ws.close(); } catch (e) {} };
+        }
+        function stopBackendWs() {
+            if (LIVE_BACKEND.wsTimer) { clearTimeout(LIVE_BACKEND.wsTimer); LIVE_BACKEND.wsTimer = null; }
+            if (LIVE_BACKEND.ws) { try { LIVE_BACKEND.ws.onclose = null; LIVE_BACKEND.ws.close(); } catch (e) {} LIVE_BACKEND.ws = null; }
+        }
+        // 连接/断开后端（面板按钮与 API 共用）
+        function connectBackend() {
+            if (LIVE_BACKEND.enabled) return;
+            if (!LIVE_BACKEND.url) {
+                const el = document.getElementById('lbBackendUrl');
+                LIVE_BACKEND.url = el ? el.value.trim() : '';
+            }
+            if (!LIVE_BACKEND.url) { updateStatus('请先填写后端地址（http 轮询 或 ws 推送）', 'error'); return; }
+            LIVE_BACKEND.enabled = true;
+            const isWs = /^wss?:\/\//i.test(LIVE_BACKEND.url);
+            if (isWs) startBackendWs(); else startBackendHttp();
+            updateBackendUi();
+        }
+        function disconnectBackend() {
+            if (!LIVE_BACKEND.enabled) return;
+            LIVE_BACKEND.enabled = false;
+            stopBackendHttp(); stopBackendWs();
+            updateStatus('已断开后端连接', 'loading');
+            updateBackendUi();
+        }
+        function toggleBackend() { LIVE_BACKEND.enabled ? disconnectBackend() : connectBackend(); }
+        function updateBackendUi() {
+            const b = document.getElementById('lbBackendBtn');
+            if (b) b.textContent = LIVE_BACKEND.enabled ? '断开后端' : '连接后端';
+        }
+
+        // ===== 定位系统后端对接（FastAPI 标签定位服务） =====
+        // 协议：POST /api/v1/auth/login {username,password} → {access_token}
+        //      GET  /api/v1/tags/positions (Bearer) → [{device_id, name, position:{x,y,z,reported_at}|null}]
+        // 坐标映射：后端 x/y 平面 → 前端 x/z（y 当 z 用）；device_id 作为多用户 id
+        const POS_BACKEND = {
+            enabled: false, token: null, timer: null, base: ''
+        };
+        function posApi(path, opts) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (POS_BACKEND.token) headers['Authorization'] = 'Bearer ' + POS_BACKEND.token;
+            return fetch(POS_BACKEND.base + path, Object.assign({ headers: headers }, opts || {}));
+        }
+        // 登录拿 token；失败抛错由调用方提示
+        async function posLogin() {
+            const u = document.getElementById('posUser');
+            const p = document.getElementById('posPass');
+            // 只用本后端，地址固定为当前页面源（通过 proxy_server.js 同源代理，无 CORS 问题）
+            POS_BACKEND.base = window.location.origin || '';
+            const username = u ? u.value.trim() : '';
+            const password = p ? p.value : '';
+            if (!POS_BACKEND.base || !username || !password) throw new Error('请填写用户名、密码');
+            const r = await fetch(POS_BACKEND.base + '/api/v1/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, password: password })
+            });
+            if (!r.ok) throw new Error('登录失败（HTTP ' + r.status + '）');
+            const d = await r.json();
+            POS_BACKEND.token = d.access_token;
+        }
+        // 拉取所有标签最新位置，喂给房间级多用户轨迹
+        async function posPoll() {
+            if (!POS_BACKEND.enabled || !POS_BACKEND.token) return;
+            let res;
+            try { res = await posApi('/api/v1/tags/positions'); }
+            catch (e) { setPosStatus('网络异常，等待重试'); return; }
+            if (res.status === 401) {
+                // token 失效：重登后下一轮继续
+                setPosStatus('登录已过期，重新登录中…');
+                try { await posLogin(); setPosStatus('已重新登录'); } catch (e) { setPosStatus('重新登录失败'); }
+                return;
+            }
+            if (!res.ok) { setPosStatus('拉取位置失败（HTTP ' + res.status + '）'); return; }
+            const list = await res.json();
+            if (!Array.isArray(list)) { setPosStatus('返回格式异常'); return; }
+            let n = 0;
+            list.forEach(t => {
+                if (!t || !t.position) return;
+                const p = t.position;
+                if (typeof p.x !== 'number' || typeof p.y !== 'number') return;
+                // y → z：后端平面坐标映射到前端 x/z
+                roomPush(t.device_id, p.x, p.y, p.reported_at ? new Date(p.reported_at).getTime() : Date.now());
+                n++;
+            });
+            // 标签坐标可能超出房间范围：按当前用户坐标包围盒检查是否需要扩大重建
+            fitRoomToUsers();
+            setPosStatus('已连接，' + list.length + ' 个标签，本轮更新 ' + n + ' 个位置');
+        }
+        // 房间尺寸按所有用户坐标调整：放不下就重建（数据在 roomLive.users 里保留）
+        function fitRoomToUsers() {
+            if (!roomScene.active || !roomScene.name) return;
+            const need = roomSizeOf(roomScene.name);
+            const curW = roomScene.W, curD = roomScene.D;
+            // 有余量则不折腾，避免频繁重建
+            if (need.w <= curW && need.d <= curD) return;
+            const nm = roomScene.name;
+            disposeRoomScene();
+            buildRoomScene(nm);
+        }
+        function setPosStatus(msg) {
+            const el = document.getElementById('posStatus');
+            if (el) el.textContent = msg;
+        }
+        async function connectPosBackend() {
+            disconnectPosBackend();
+            try {
+                await posLogin();
+                POS_BACKEND.enabled = true;
+                posPoll();
+                POS_BACKEND.timer = setInterval(posPoll, 2000);
+                setPosStatus('已连接：' + POS_BACKEND.base);
+            } catch (e) {
+                setPosStatus(e.message || '连接失败');
+            }
+            updatePosUi();
+        }
+        function disconnectPosBackend() {
+            if (POS_BACKEND.timer) { clearInterval(POS_BACKEND.timer); POS_BACKEND.timer = null; }
+            POS_BACKEND.enabled = false; POS_BACKEND.token = null;
+            setPosStatus('未连接');
+            updatePosUi();
+        }
+        function togglePosBackend() { POS_BACKEND.enabled ? disconnectPosBackend() : connectPosBackend(); }
+        function updatePosUi() {
+            const b = document.getElementById('posConnBtn');
+            if (b) b.textContent = POS_BACKEND.enabled ? '断开定位后端' : '连接定位后端';
+        }
+
         // HTTP JSON 轮询：期望 {x,z,floor,ts} 或 {current:{...}} 或 数组（取最后一项）
         function startLivePolling(url, interval) {
             stopLivePolling();
@@ -3632,10 +3839,12 @@
             const pb = document.getElementById('lbPollBtn');
             if (pb) pb.textContent = liveState.pollTimer ? '停止轮询' : '开始轮询';
         }
-        // 外部 iframe / 父页面 postMessage 推送：{ type:'indoor-live', data:{x,z,floor,ts,room,abs} }
+        // 外部 iframe / 父页面 postMessage 推送：{ type:'indoor-live', data:{x,z,floor,ts,room,abs} } 或 { type:'indoor-live', positions:[...] }
         window.addEventListener('message', function (ev) {
             const d = ev.data;
-            if (d && d.type === 'indoor-live' && d.data && typeof d.data.x === 'number' && typeof d.data.z === 'number') {
+            if (!d || d.type !== 'indoor-live') return;
+            if (d.positions) { ingestLiveData(d.positions); return; }
+            if (d.data && typeof d.data.x === 'number' && typeof d.data.z === 'number') {
                 pushLivePoint(d.data.x, d.data.z, d.data.floor, d.data.ts, d.data.room, d.data.abs);
             }
         });
@@ -3653,7 +3862,12 @@
             setPolling(url, interval) { startLivePolling(url, interval); },
             stopPolling() { stopLivePolling(); },
             startDemo(interval) { startLiveDemo(interval); },
-            stopDemo() { stopLiveDemo(); }
+            stopDemo() { stopLiveDemo(); },
+            // 后端对接
+            setBackend(url, interval) { LIVE_BACKEND.url = url; if (interval) LIVE_BACKEND.interval = interval; const el = document.getElementById('lbBackendUrl'); if (el) el.value = url; },
+            connect() { connectBackend(); },
+            disconnect() { disconnectBackend(); },
+            ingest(data) { return ingestLiveData(data); }
         };
 
         // ===== 房间级 3D 建模：点击店铺进入房间视图 + 上传房间内部数据 =====
@@ -3773,7 +3987,7 @@
             if (indoor.active && indoor.floors && indoor.floors[indoor.current]) {
                 const fl = indoor.floors[indoor.current];
                 const e = fl.shops.find(s => s.data && (s.data.name === name || s.data.id === name));
-                if (e && e.data) { if (e.data.w) w = e.data.w; if (e.data.d) d = e.data.d; return { w: w, d: d }; }
+                if (e && e.data) { if (e.data.w) w = e.data.w; if (e.data.d) d = e.data.d; }
             }
             const m = roomModels[name];
             if (m && m.items && m.items.length) {
@@ -3781,6 +3995,13 @@
                 m.items.forEach(it => { mx = Math.max(mx, Math.abs(it.x || 0) + (it.w || 2) / 2); mz = Math.max(mz, Math.abs(it.z || 0) + (it.d || 2) / 2); });
                 w = Math.max(w, mx * 2 + 2); d = Math.max(d, mz * 2 + 2);
             }
+            // 后端标签坐标可能超出房间，按当前所有用户坐标包围盒扩房（留 1.5m 边距）
+            let bx = 0, bz = 0;
+            Object.keys(roomLive.users).forEach(uid => {
+                const c = roomLive.users[uid].current;
+                if (c) { bx = Math.max(bx, Math.abs(c.x)); bz = Math.max(bz, Math.abs(c.z)); }
+            });
+            if (bx || bz) { w = Math.max(w, bx * 2 + 3); d = Math.max(d, bz * 2 + 3); }
             return { w: Math.ceil(w), d: Math.ceil(d) };
         }
         // 构建房间 3D 场景（独立 renderer/canvas；坐标=房间内相对坐标，房间中心为原点）
@@ -4035,6 +4256,7 @@
         // 退出房间 3D 建模独立页面，返回建筑 3D（幂等：未激活时直接返回）
         function exitRoom3D() {
             if (!roomScene.active) return;
+            disconnectPosBackend(); // 退出房间页时停掉定位后端轮询
             disposeRoomScene();
             const ov = document.getElementById('roomOverlay');
             ov.classList.remove('show');
@@ -4104,7 +4326,18 @@
                 return { room: roomScene.active ? roomScene.name : null, online: roomLive.order.length, users: users };
             },
             startDemo() { roomDemo(); return { ok: true }; },
-            stopDemo() { if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; } return { ok: true }; }
+            stopDemo() { if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; } return { ok: true }; },
+            // 定位系统后端对接：connect({username, password}) / disconnect()
+            async connect(cfg) {
+                if (cfg) {
+                    const un = document.getElementById('posUser'), pw = document.getElementById('posPass');
+                    if (un && cfg.username) un.value = cfg.username;
+                    if (pw && cfg.password) pw.value = cfg.password;
+                }
+                await connectPosBackend();
+                return { ok: POS_BACKEND.enabled, status: (document.getElementById('posStatus') || {}).textContent };
+            },
+            disconnect() { disconnectPosBackend(); return { ok: true }; }
         };
 
         // ===== 室内 3D 建模自定义（全局面板控制） =====
@@ -4882,6 +5115,12 @@
             <div style="margin-top:8px;font-size:11px;color:var(--hud-text-2);line-height:1.7;">
                 调用：<code>IndoorRoomAPI.push({id:'用户A', x:1.5, z:-0.8})</code>（id 缺省为 u1；同房间多用户各自独立轨迹）
             </div>
+            <div class="rl-ctrl" style="border-top:1px dashed rgba(34,197,94,.3);padding-top:10px;margin-top:10px;">
+                <input id="posUser" class="lb-input" placeholder="用户名" style="flex:1;">
+                <input id="posPass" type="password" class="lb-input" placeholder="密码" style="flex:1;">
+                <button class="rl-btn" id="posConnBtn" onclick="togglePosBackend()">连接定位后端</button>
+            </div>
+            <div id="posStatus" style="margin-top:6px;font-size:11px;color:var(--hud-text-2);">未连接。登录后每 2s 拉取后端标签位置，按 device_id 分色显示在房间中；房间会按标签坐标自动扩大。</div>
         </div>
     </div>
 
