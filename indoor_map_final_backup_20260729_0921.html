@@ -487,7 +487,7 @@
         }
         /* 房间页实时位置面板（左下角） */
         .room-livebox {
-            left: 16px; bottom: 16px; width: min(300px, 86vw);
+            left: 16px; bottom: 16px; width: min(320px, 86vw);
             background: var(--hud-bg); border: 1px solid rgba(34,197,94,.45); border-radius: var(--radius);
             padding: 12px 14px; box-shadow: var(--hud-shadow);
         }
@@ -505,6 +505,38 @@
         .room-livebox .rl-btn:hover { background: rgba(34,197,94,.28); }
         .room-livebox .rl-btn.danger { border-color: rgba(220,38,38,.5); background: rgba(220,38,38,.12); color: #fca5a5; }
         .room-livebox .rl-btn.danger:hover { background: rgba(220,38,38,.24); }
+
+        /* 房间页顶部：多用户轨迹主功能条（显眼入口） */
+        .room-trackbar {
+            position: absolute; top: 68px; left: 50%; transform: translateX(-50%);
+            z-index: 12; display: flex; align-items: center; gap: 12px;
+            background: rgba(15,17,21,.92); border: 1px solid rgba(34,197,94,.55);
+            border-radius: 12px; padding: 10px 16px; box-shadow: 0 4px 20px rgba(0,0,0,.4);
+        }
+        .room-trackbar .rt-title {
+            font-size: 14px; font-weight: 700; color: #4ade80; white-space: nowrap;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .room-trackbar .rt-title::before {
+            content: ''; width: 10px; height: 10px; border-radius: 50%;
+            background: #22c55e; box-shadow: 0 0 8px #22c55e;
+        }
+        .room-trackbar .rt-btn {
+            padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700;
+            border: 1px solid rgba(34,197,94,.6); background: rgba(34,197,94,.18); color: #4ade80;
+            transition: background .15s; white-space: nowrap;
+        }
+        .room-trackbar .rt-btn:hover { background: rgba(34,197,94,.34); }
+        .room-trackbar .rt-btn.primary { background: #22c55e; color: #06250f; border-color: #22c55e; }
+        .room-trackbar .rt-btn.primary:hover { background: #4ade80; }
+        .room-trackbar .rt-btn.danger { border-color: rgba(220,38,38,.6); background: rgba(220,38,38,.15); color: #fca5a5; }
+        .room-trackbar .rt-btn.danger:hover { background: rgba(220,38,38,.3); }
+        .room-trackbar .rt-stat { font-size: 12px; color: var(--hud-text-2); white-space: nowrap; }
+        .room-trackbar .rt-stat b { color: #fff; font-variant-numeric: tabular-nums; }
+        @media (max-width: 720px) {
+            .room-trackbar { top: 60px; flex-wrap: wrap; justify-content: center; padding: 8px 12px; gap: 8px; }
+            .room-trackbar .rt-btn { padding: 7px 12px; font-size: 12px; }
+        }
 
         /* HUD 通用：容器不挡事件，子元素可交互 */
         .hud { position: absolute; z-index: 10; color: var(--hud-text); pointer-events: none; }
@@ -628,7 +660,6 @@
             .hud-bottom { width: 94vw; }
             .hud-locate { left: 8px; bottom: 8px; width: min(46vw, 220px); }
             .hud-navbox { right: 8px; bottom: 8px; width: min(46vw, 220px); }
-            .hud-livebox { top: 58px; width: min(92vw, 300px); }
             .hud-top .mall-title { font-size: 15px; }
         }
 
@@ -789,45 +820,13 @@
         .nav-btn.room-btn:hover { background: rgba(34,197,94,.28); }
 
         /* 实时位置 API 面板：顶部居中、可折叠，不遮挡建模 */
-        .hud-livebox {
-            left: 50%; top: 64px; transform: translateX(-50%);
-            width: min(340px, 92vw);
-            background: var(--hud-bg); border: 1px solid rgba(34,197,94,.4); border-radius: var(--radius);
-            overflow: hidden; box-shadow: var(--hud-shadow);
-        }
-        .hud-livebox .lb-head {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 9px 14px; cursor: pointer; user-select: none;
-            background: rgba(34,197,94,.12);
-        }
-        .hud-livebox .lb-title { font-size: 13px; font-weight: 700; color: #4ade80; }
-        .hud-livebox .lb-status { font-size: 11px; color: var(--hud-text-2); }
-        .hud-livebox .lb-toggle { font-size: 13px; color: var(--hud-text-2); transition: transform .2s; }
-        .hud-livebox.collapsed .lb-toggle { transform: rotate(-90deg); }
-        .hud-livebox.collapsed .lb-body { display: none; }
-        .hud-livebox .lb-body { padding: 10px 14px 12px; }
-        .hud-livebox .lb-rows { font-size: 12px; }
-        .hud-livebox .lb-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .hud-livebox .lb-row span { color: var(--hud-text-2); }
-        .hud-livebox .lb-row b { color: #fff; font-variant-numeric: tabular-nums; }
-        .hud-livebox .lb-ctrl { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-        .hud-livebox .lb-btn {
-            padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
-            border: 1px solid rgba(34,197,94,.5); background: rgba(34,197,94,.14); color: #4ade80;
-            transition: background .15s;
-        }
-        .hud-livebox .lb-btn:hover { background: rgba(34,197,94,.28); }
-        .hud-livebox .lb-btn.danger { border-color: rgba(220,38,38,.5); background: rgba(220,38,38,.12); color: #fca5a5; }
-        .hud-livebox .lb-btn.danger:hover { background: rgba(220,38,38,.24); }
-        .hud-livebox .lb-poll { display: flex; gap: 8px; margin-top: 10px; }
-        .hud-livebox .lb-input {
+        /* 通用输入框（房间页后端登录等复用） */
+        .lb-input {
             flex: 1; min-width: 0; padding: 6px 10px; border-radius: 6px; font-size: 12px;
             border: 1px solid var(--hud-border); background: rgba(255,255,255,.06); color: var(--hud-text);
+            outline: none;
         }
-        .hud-livebox .lb-api { margin-top: 10px; font-size: 11px; color: var(--hud-text-2); line-height: 1.7; }
-        .hud-livebox .lb-api code {
-            background: rgba(76,141,255,.14); padding: 1px 5px; border-radius: 4px; color: #cfe0ff;
-        }
+        .lb-input:focus { border-color: rgba(34,197,94,.6); }
 
         /* ===== 教程与引导 ===== */
         .hud-btn.tut-btn { background: var(--hud-accent); color: #fff; border: 1px solid transparent; }
@@ -1071,42 +1070,6 @@
                 <span class="nb-toggle" id="hudNavToggle">▾</span>
             </div>
             <div class="nb-body" id="hudNavSteps"></div>
-        </div>
-        <!-- HUD：实时位置 API 面板（顶部居中、可折叠，不遮挡建模） -->
-        <div class="hud hud-livebox collapsed" id="hudLiveBox">
-            <div class="lb-head" onclick="toggleLiveBox()">
-                <span class="lb-title">实时位置 · API</span>
-                <span class="lb-status" id="lbStatus">未接入</span>
-                <span class="lb-toggle" id="lbToggle">▸</span>
-            </div>
-            <div class="lb-body">
-                <div class="lb-rows">
-                    <div class="lb-row"><span>所在房间</span><b id="lbRoom">—</b></div>
-                    <div class="lb-row"><span>楼层</span><b id="lbFloor">—</b></div>
-                    <div class="lb-row"><span>X</span><b id="lbX">—</b></div>
-                    <div class="lb-row"><span>Z</span><b id="lbZ">—</b></div>
-                    <div class="lb-row"><span>更新时间</span><b id="lbTs">—</b></div>
-                    <div class="lb-row"><span>轨迹点数</span><b id="lbCount">0</b></div>
-                </div>
-                <div class="lb-ctrl">
-                    <button class="lb-btn" onclick="startLiveDemo()">模拟演示</button>
-                    <button class="lb-btn danger" onclick="stopLiveDemo()">停止演示</button>
-                    <button class="lb-btn danger" onclick="clearLiveTrace()">清除轨迹</button>
-                </div>
-                <div class="lb-poll">
-                    <input id="lbPollUrl" class="lb-input" placeholder="JSON 接口地址（可选，如 http://localhost:8080/pos）">
-                    <button class="lb-btn" id="lbPollBtn" onclick="toggleLivePolling()">开始轮询</button>
-                </div>
-                <div class="lb-poll">
-                    <input id="lbBackendUrl" class="lb-input" placeholder="后端地址（http 轮询 / ws 推送，如 http://localhost:3000/live）">
-                    <button class="lb-btn" id="lbBackendBtn" onclick="toggleBackend()">连接后端</button>
-                </div>
-                <div class="lb-api">
-                    JS 调用：<code>IndoorLiveAPI.push({room:'优衣库', x:2, z:-1, floor:'L1'})</code><br>
-                    数据格式：<code>{"x":10,"z":-5,"floor":"L1"}</code>（floor 也可用索引 0,1,2…）<br>
-                    后端返回：<code>{"positions":[{"id":"u1","x":1,"z":2,"room":"优衣库"}]}</code> 或单条；带 room 走房间轨迹
-                </div>
-            </div>
         </div>
         <!-- 悬停浮层 -->
         <div class="hud-tooltip" id="hudTooltip"></div>
@@ -2262,10 +2225,6 @@
             if (ns) ns.innerHTML = '';
             const navBox = document.getElementById('hudNavBox');
             if (navBox) navBox.style.display = 'none';
-            // 退出 3D 时停止实时位置演示/轮询/后端连接定时器（轨迹数据保留，重新进入后自动恢复显示）
-            stopLiveDemo();
-            stopLivePolling();
-            disconnectBackend();
             overlay.classList.remove('show');
             setTimeout(() => {
                 overlay.classList.remove('active');
@@ -2680,8 +2639,6 @@
                 const e = { clientX: hoverXY[0], clientY: hoverXY[1] };
                 const hits = screenToMeshes(e, floorShops(), false);
                 const tip = document.getElementById('hudTooltip');
-                // 悬停时不覆盖「实时定位高亮房间」的 emissive（保持 0.9）
-                const isRoomHl = (m) => liveRoomMesh && m === liveRoomMesh;
                 if (hits.length) {
                     const s = hits[0].object.userData.shop;
                     const ob = overlay.getBoundingClientRect();
@@ -2689,12 +2646,12 @@
                     tip.style.left = (e.clientX - ob.left + 14) + 'px';
                     tip.style.top = (e.clientY - ob.top + 14) + 'px';
                     tip.innerHTML = `<div class="t-name">${s.name}</div><div class="t-cat" style="color:${CAT_META[s.cat].css}">${CAT_META[s.cat].label} · ${s.floor}</div><div style="margin-top:3px;color:#9ab;">${s.desc}</div>`;
-                    if (hovered && hovered !== hits[0].object && !isRoomHl(hovered)) setEmissive(hovered, 0.12);
-                    hovered = hits[0].object; if (!isRoomHl(hovered)) setEmissive(hovered, 0.5);
+                    if (hovered && hovered !== hits[0].object) setEmissive(hovered, 0.12);
+                    hovered = hits[0].object; setEmissive(hovered, 0.5);
                     renderer.domElement.style.cursor = 'pointer';
                 } else {
                     tip.style.display = 'none';
-                    if (hovered) { if (!isRoomHl(hovered)) setEmissive(hovered, hovered === selected ? 0.5 : 0.12); hovered = null; }
+                    if (hovered) { setEmissive(hovered, hovered === selected ? 0.5 : 0.12); hovered = null; }
                     renderer.domElement.style.cursor = 'grab';
                 }
             }
@@ -2820,6 +2777,7 @@
                 m.userData.floor = fName;
                 floors[indoor.current].group.add(m);
                 updateStatus('已放置' + facilityLabel(editFacilityType), 'success');
+                saveEdConfig();
             }
             function removeFacility(obj) {
                 const fac = obj.userData.fac; const fName = obj.userData.floor || curFloorName();
@@ -2828,6 +2786,7 @@
                 floors[indoor.current].group.remove(obj);
                 obj.traverse(n => { if (n.geometry) n.geometry.dispose(); if (n.material) { Array.isArray(n.material) ? n.material.forEach(m => m.dispose()) : n.material.dispose(); } });
                 updateStatus('已删除设施', 'success');
+                saveEdConfig();
             }
             function removeWall(obj) {
                 const w = obj.userData.wall; const fName = obj.userData.floor || curFloorName();
@@ -2836,6 +2795,7 @@
                 floors[indoor.current].group.remove(obj);
                 if (obj.geometry) obj.geometry.dispose(); if (obj.material) obj.material.dispose();
                 updateStatus('已删除一段内墙', 'success');
+                saveEdConfig();
             }
             function facilityLabel(t) { return ({ elevator: '电梯', escalator: '扶梯', stairs: '楼梯', fountain: '中庭喷泉' })[t] || t; }
 
@@ -2879,7 +2839,6 @@
                 });
                 controls.target.y = indoor.current * FH;
                 updateMyPosVisibility(); // 「我的位置」标记仅在本层显示
-                updateLiveVisibility();  // 实时位置标记与轨迹线随楼层显隐
             }
             function render3DFloorCtrl() {
                 const ctrl = document.getElementById('hudFloorCtrl');
@@ -3089,10 +3048,6 @@
                     const ps = 1 + Math.sin(performance.now() * 0.004) * 0.12; // 轻微呼吸脉冲
                     indoor.myPosMarker.scale.x = ps; indoor.myPosMarker.scale.z = ps;
                 }
-                if (indoor.liveMarker && indoor.liveMarker.visible) {
-                    const ps2 = 1 + Math.sin(performance.now() * 0.005) * 0.14; // 实时位置脉冲
-                    indoor.liveMarker.scale.x = ps2; indoor.liveMarker.scale.z = ps2;
-                }
                 renderer.render(scene, camera);
                 labelRenderer.render(scene, camera);
             }
@@ -3121,8 +3076,6 @@
             if (locBtn) locBtn.onclick = startLocateMyPos;
             // 若重建前已标记过「我的位置」，恢复其 3D 标记
             rebuildMyPosMarker();
-            // 恢复实时位置轨迹（API 数据跨重建保留）
-            rebuildLiveVisuals();
 
             applyFloorVisibility();
             render3DFloorCtrl();
@@ -3159,10 +3112,8 @@
                 active: false, scene: null, camera: null, renderer: null, labelRenderer: null,
                 controls: null, raycaster: null, mouse: null, floors: [], current: 0,
                 selected: null, nav: null, switchFloor: null, animId: null, myPosMarker: null,
-                liveMarker: null, liveLines: null, liveRoomBox: null,
-                _onMove: null, _onClick: null, _onResize: null
+                _onMove: null, _onDown: null, _onUp: null, _onResize: null
             };
-            liveRoomMesh = null; liveRoomEmissive = 0;
             // 房间页随建筑销毁一并退出（若正处房间页）
             if (roomScene.active) { disposeRoomScene(); const rov = document.getElementById('roomOverlay'); if (rov) rov.classList.remove('active', 'show'); document.body.classList.remove('room-mode'); }
             const rbtn = document.getElementById('hudRoomBtn');
@@ -3245,460 +3196,6 @@
             updateStatus('已清除定位', 'loading');
         }
 
-        // ===== 实时位置 API（IndoorLiveAPI）· 单目标实时轨迹 =====
-        let liveState = { points: [], current: null, curSeg: null, demoTimer: null, pollTimer: null, pollUrl: '' };
-
-        // 楼层名可能传 'L1'/'B1'/索引/显示名，统一归一到 floorData 索引；缓存避免高频推送反复查
-        let _floorIdxCache = { fd: null, map: new Map() };
-        function resolveLiveFloor(fl) {
-            const fallback = (indoor.active ? indoor.current : 0);
-            if (fl === undefined || fl === null || fl === '') return fallback;
-            if (typeof fl === 'number' && isFinite(fl)) {
-                const i = Math.round(fl);
-                return (floorData && i >= 0 && i < floorData.length) ? i : fallback;
-            }
-            const su = String(fl).trim().toUpperCase();
-            if (!su) return fallback;
-            if (_floorIdxCache.fd !== floorData) { _floorIdxCache.fd = floorData; _floorIdxCache.map = new Map(); }
-            if (_floorIdxCache.map.has(su)) return _floorIdxCache.map.get(su);
-            let idx = fallback;
-            if (floorData) {
-                for (let i = 0; i < floorData.length; i++) {
-                    const n = String(floorData[i].name || '').toUpperCase();
-                    const d = String(floorData[i].display || '').toUpperCase();
-                    if (n === su || d === su) { idx = i; break; }
-                }
-                if (idx === fallback) {
-                    const bm = su.match(/^B(\d+)$/);
-                    if (bm) {
-                        const want = parseInt(bm[1], 10);
-                        for (let i = 0; i < floorData.length; i++) {
-                            const m = String(floorData[i].name || '').toUpperCase().match(/^B(\d+)$/);
-                            if (m && parseInt(m[1], 10) === want) { idx = i; break; }
-                        }
-                    }
-                }
-                if (idx === fallback) {
-                    const dm = su.match(/^(\d+)$/) || su.match(/^L(\d+)$/);
-                    if (dm) {
-                        const want = parseInt(dm[1], 10);
-                        if (want < floorData.length) idx = want;
-                        else for (let i = 0; i < floorData.length; i++) {
-                            const m = String(floorData[i].name || '').match(/(\d+)/);
-                            if (m && parseInt(m[1], 10) === want) { idx = i; break; }
-                        }
-                    }
-                }
-            }
-            _floorIdxCache.map.set(su, idx);
-            return idx;
-        }
-        // 房间语义：在 floors[fi].shops 中按店铺名或 id 查找（忽略大小写）
-        function findLiveRoom(room, fi) {
-            if (!indoor.active || !indoor.floors || !indoor.floors[fi]) return null;
-            const shops = indoor.floors[fi].shops || [];
-            const q = String(room || '').trim().toLowerCase();
-            if (!q) return null;
-            return shops.find(s => (s.data && (String(s.data.name || '').toLowerCase() === q || String(s.data.id || '').toLowerCase() === q))) || null;
-        }
-        // 房间内相对坐标（以房间中心为原点，米）→ 建筑场景坐标（考虑店铺朝向 rot）
-        function roomRelToScene(entry, rx, rz) {
-            const rot = (entry.data && entry.data.rot) || 0;
-            const c = Math.cos(rot), s = Math.sin(rot);
-            return { x: entry.world.x + rx * c - rz * s, z: entry.world.z + rx * s + rz * c };
-        }
-        // 场景坐标是否落在店铺矩形内（考虑 w/d/rot）
-        function shopRectContains(entry, x, z) {
-            const d = entry.data || {};
-            const w = (d.w != null ? d.w : 12) / 2, h = (d.d != null ? d.d : 12) / 2;
-            const rot = d.rot || 0;
-            const dx = x - entry.world.x, dz = z - entry.world.z;
-            const c = Math.cos(-rot), s = Math.sin(-rot); // 逆旋转回店铺本地系
-            const lx = dx * c - dz * s, lz = dx * s + dz * c;
-            return Math.abs(lx) <= w && Math.abs(lz) <= h;
-        }
-        // 反查场景坐标所在房间（当前层店铺）
-        function locateRoomAt(x, z, fi) {
-            if (!indoor.active || !indoor.floors || !indoor.floors[fi]) return null;
-            const shops = indoor.floors[fi].shops || [];
-            for (let i = 0; i < shops.length; i++) {
-                if (shops[i].data && shopRectContains(shops[i], x, z)) return shops[i];
-            }
-            return null;
-        }
-        // 房间高亮：记录店铺 mesh 原 emissiveIntensity，增强高亮；叠加顶部线框示意
-        let liveRoomMesh = null, liveRoomEmissive = 0, liveRoomName = null;
-        function applyLiveRoomHighlight() {
-            if (!indoor.active || !indoor.scene || !liveState.current) return;
-            const name = liveState.current.room || null;
-            if (liveRoomName === name) return; // 同房间高频推送：无需重复重建
-            clearLiveRoomHighlight();
-            liveRoomName = name;
-            if (!name) return;
-            const entry = findLiveRoom(name, liveState.current.floor);
-            if (!entry || !entry.mesh) return;
-            liveRoomMesh = entry.mesh;
-            liveRoomEmissive = entry.mesh.material.emissiveIntensity;
-            entry.mesh.material.emissiveIntensity = 0.9;
-            // 顶部线框（基于 w/d 包围盒，示意房间边界）
-            const d = entry.data || {};
-            const w = (d.w != null ? d.w : 12), h = (d.d != null ? d.d : 12);
-            const geo = new THREE.BoxGeometry(w, 2.2, h);
-            const edges = new THREE.EdgesGeometry(geo);
-            const box = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.95 }));
-            box.position.set(entry.world.x, liveState.current.floor * indoorConfig.FH - indoorConfig.FH / 2 + 1.6, entry.world.z);
-            box.rotation.y = d.rot || 0;
-            indoor.scene.add(box);
-            indoor.liveRoomBox = box;
-        }
-        function clearLiveRoomHighlight() {
-            if (liveRoomMesh) { liveRoomMesh.material.emissiveIntensity = liveRoomEmissive; liveRoomMesh = null; }
-            liveRoomName = null;
-            if (indoor.liveRoomBox && indoor.scene) { indoor.scene.remove(indoor.liveRoomBox); indoor.liveRoomBox = null; }
-        }
-        // 核心：写入一个实时位置点（API 与演示/轮询共用入口）
-        // room：可选，店铺名或 id；abs=true 时 x/z 为建筑场景坐标，否则视为房间内相对坐标（以房间中心为原点）
-        // 性能优化：同层高频推送时只增量更新当前轨迹段与标记位置（不重建整个轨迹）
-        function pushLivePoint(x, z, floor, ts, room, abs) {
-            if (typeof x !== 'number' || typeof z !== 'number' || !isFinite(x) || !isFinite(z)) {
-                return { ok: false, msg: 'x/z 必须为数字' };
-            }
-            const fi = resolveLiveFloor(floor);
-            let sx = x, sz = z, roomName = null;
-            if (room && !abs) {
-                // 房间内相对坐标 → 场景坐标（房间未找到时拒绝，避免错误落点）
-                const entry = findLiveRoom(room, fi);
-                if (!entry) return { ok: false, msg: '未找到房间：' + room };
-                const sc = roomRelToScene(entry, x, z);
-                sx = sc.x; sz = sc.z; roomName = entry.data.name;
-            } else if (!room) {
-                // 未指定房间：按场景坐标，并自动反查所在房间
-                const hit = locateRoomAt(x, z, fi);
-                roomName = hit ? hit.data.name : null;
-            } else {
-                // abs:true：x/z 直接是场景坐标，若给了 room 则仅用于显示
-                const entry = findLiveRoom(room, fi);
-                roomName = entry ? entry.data.name : String(room);
-            }
-            const pt = { x: +sx.toFixed(1), z: +sz.toFixed(1), floor: fi, ts: ts || Date.now(), room: roomName };
-            liveState.points.push(pt);
-            // 批量截断（避免高频推送时每次 shift() 的 O(n) 复制）
-            if (liveState.points.length > 2100) liveState.points.splice(0, liveState.points.length - 2000);
-            liveState.current = pt;
-            updateLivePanel();
-            applyLiveRoomHighlight();
-            if (indoor.active && indoor.scene) {
-                const seg = liveState.curSeg;
-                if (seg && seg.floor === fi && indoor.liveMarker) {
-                    // 同层增量：追加顶点到当前段 + 移动标记（不触发全量重建）
-                    seg.pts.push({ x: pt.x, z: pt.z });
-                    refreshLiveSeg(seg);
-                    indoor.liveMarker.position.x = pt.x;
-                    indoor.liveMarker.position.z = pt.z;
-                } else {
-                    rebuildLiveVisuals();
-                }
-            }
-            return { ok: true, count: liveState.points.length, room: roomName };
-        }
-        // 仅重建当前轨迹段（增量路径）：更新或创建该段的 Line 几何体
-        function refreshLiveSeg(seg) {
-            if (!seg || !indoor.scene) return;
-            const gy = seg.floor * indoorConfig.FH - indoorConfig.FH / 2 + 1.2;
-            const verts = seg.pts.map(p => new THREE.Vector3(p.x, gy, p.z));
-            if (seg.line) {
-                seg.line.geometry.dispose();
-                seg.line.geometry = new THREE.BufferGeometry().setFromPoints(verts);
-            } else if (verts.length >= 2) {
-                const geo = new THREE.BufferGeometry().setFromPoints(verts);
-                const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.9 }));
-                line.userData = { kind: 'liveline', floor: seg.floor };
-                if (!indoor.liveLines) { indoor.liveLines = new THREE.Group(); indoor.scene.add(indoor.liveLines); }
-                indoor.liveLines.add(line);
-                seg.line = line;
-            }
-        }
-        // 缓存实时位置面板 DOM 引用（避免高频推送时反复 getElementById）
-        let _lbEls = null;
-        function livePanelEls() {
-            if (!_lbEls) {
-                _lbEls = {
-                    room: document.getElementById('lbRoom'),
-                    floor: document.getElementById('lbFloor'),
-                    x: document.getElementById('lbX'),
-                    z: document.getElementById('lbZ'),
-                    ts: document.getElementById('lbTs'),
-                    count: document.getElementById('lbCount'),
-                    status: document.getElementById('lbStatus')
-                };
-            }
-            return _lbEls;
-        }
-        // 刷新 HUD 面板数值
-        function updateLivePanel() {
-            const c = liveState.current;
-            const E = livePanelEls();
-            if (c) {
-                if (E.room) E.room.textContent = c.room || '—';
-                if (E.floor) E.floor.textContent = (floorData[c.floor] && floorData[c.floor].display) || ('F' + c.floor);
-                if (E.x) E.x.textContent = c.x;
-                if (E.z) E.z.textContent = c.z;
-                if (E.ts) E.ts.textContent = new Date(c.ts).toLocaleTimeString();
-            } else {
-                if (E.room) E.room.textContent = '—';
-                if (E.floor) E.floor.textContent = '—';
-                if (E.x) E.x.textContent = '—';
-                if (E.z) E.z.textContent = '—';
-                if (E.ts) E.ts.textContent = '—';
-            }
-            if (E.count) E.count.textContent = liveState.points.length;
-            if (E.status) E.status.textContent = liveState.current ? '已接入' : '未接入';
-        }
-        // 折叠/展开实时位置面板
-        function toggleLiveBox() {
-            const box = document.getElementById('hudLiveBox');
-            if (!box) return;
-            box.classList.toggle('collapsed');
-            const t = document.getElementById('lbToggle');
-            if (t) t.textContent = box.classList.contains('collapsed') ? '▸' : '▾';
-        }
-        // 依据 liveState.points 重建 3D 轨迹线（按连续同层分段）与实时位置标记
-        function rebuildLiveVisuals() {
-            if (!indoor.scene || !indoor.active) return;
-            if (indoor.liveLines) { indoor.scene.remove(indoor.liveLines); indoor.liveLines = null; }
-            if (indoor.liveMarker) { indoor.scene.remove(indoor.liveMarker); indoor.liveMarker = null; }
-            const pts = liveState.points;
-            if (!pts.length) return;
-            const FH = indoorConfig.FH;
-            // 按「连续同层」分段（换层即断开，不跨层连线）
-            const segs = [];
-            let cur = null;
-            pts.forEach(p => {
-                if (!cur || cur.floor !== p.floor) { cur = { floor: p.floor, pts: [] }; segs.push(cur); }
-                cur.pts.push(p);
-            });
-            const linesGrp = new THREE.Group();
-            segs.forEach(sg => {
-                if (sg.pts.length < 2) return;
-                const gy = sg.floor * FH - FH / 2 + 1.2; // 楼板顶面之上
-                const verts = sg.pts.map(p => new THREE.Vector3(p.x, gy, p.z));
-                const geo = new THREE.BufferGeometry().setFromPoints(verts);
-                const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.9 }));
-                line.userData = { kind: 'liveline', floor: sg.floor };
-                linesGrp.add(line);
-                sg.line = line; // 记录，供增量更新复用
-            });
-            if (linesGrp.children.length) { indoor.scene.add(linesGrp); indoor.liveLines = linesGrp; }
-            // 记录最后一个段作为增量更新的当前段（其 pts 为独立拷贝，追加不影响 segs）
-            const lastSeg = segs[segs.length - 1];
-            liveState.curSeg = lastSeg ? { floor: lastSeg.floor, pts: lastSeg.pts.slice(), line: lastSeg.line || null } : null;
-            // 当前实时位置标记（绿色图钉 + 光圈）
-            const c = liveState.current;
-            if (c) {
-                const gy = c.floor * FH - FH / 2 + 1;
-                const grp = new THREE.Group();
-                const ring = new THREE.Mesh(
-                    new THREE.RingGeometry(3.5, 5.5, 28),
-                    new THREE.MeshBasicMaterial({ color: 0x4ade80, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
-                );
-                ring.rotation.x = -Math.PI / 2; ring.position.y = gy + 0.2; grp.add(ring);
-                const pin = new THREE.Mesh(
-                    new THREE.ConeGeometry(2.6, 8, 18),
-                    new THREE.MeshStandardMaterial({ color: 0x4ade80, emissive: 0x22c55e, emissiveIntensity: 0.6 })
-                );
-                pin.rotation.x = Math.PI; pin.position.y = gy + 6.5; grp.add(pin);
-                const head = new THREE.Mesh(
-                    new THREE.SphereGeometry(2.2, 16, 16),
-                    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x4ade80, emissiveIntensity: 0.9 })
-                );
-                head.position.y = gy + 11.5; grp.add(head);
-                grp.position.set(c.x, 0, c.z);
-                grp.userData.kind = 'livemarker';
-                indoor.scene.add(grp);
-                indoor.liveMarker = grp;
-            }
-            updateLiveVisibility();
-            // 场景重建后恢复房间高亮（mesh 引用已更新；强制重建避免同名跳过）
-            liveRoomName = null;
-            applyLiveRoomHighlight();
-        }
-        // 楼层显隐：标记仅在本层显示；各层轨迹线按距离当前层调透明度；房间高亮框仅当前层显示
-        function updateLiveVisibility() {
-            if (indoor.liveMarker) indoor.liveMarker.visible = !!(liveState.current && liveState.current.floor === indoor.current);
-            if (indoor.liveRoomBox) indoor.liveRoomBox.visible = !!(liveState.current && liveState.current.floor === indoor.current);
-            if (indoor.liveLines) {
-                indoor.liveLines.children.forEach(o => {
-                    if (!o.userData || o.userData.kind !== 'liveline') return;
-                    const diff = Math.abs(o.userData.floor - indoor.current);
-                    const op = diff === 0 ? 0.95 : diff === 1 ? 0.4 : 0.15;
-                    if (o.material) { o.material.opacity = op; o.material.transparent = op < 1; }
-                });
-            }
-        }
-        // 清除轨迹与标记
-        function clearLiveTrace() {
-            liveState.points = [];
-            liveState.current = null;
-            liveState.curSeg = null;
-            clearLiveRoomHighlight();
-            if (indoor.scene) {
-                if (indoor.liveLines) { indoor.scene.remove(indoor.liveLines); indoor.liveLines = null; }
-                if (indoor.liveMarker) { indoor.scene.remove(indoor.liveMarker); indoor.liveMarker = null; }
-            }
-            updateLivePanel();
-            updateStatus('已清除实时位置轨迹', 'loading');
-        }
-        // 演示：随机游走（默认 800ms 一个点）
-        function startLiveDemo(interval) {
-            stopLiveDemo();
-            if (!indoor.active) { updateStatus('请先进入 3D 模式再启动演示', 'error'); return; }
-            const W = indoorConfig.W, D = indoorConfig.D;
-            let fi = indoor.current;
-            // 优先在当前层选一个真实店铺作为演示房间，用「房间内相对坐标」在其内部游走（与真实接入方式一致）
-            const fl = indoor.floors && indoor.floors[fi];
-            const roomShops = (fl && fl.shops && fl.shops.filter(s => s.data && s.data.w != null)) || [];
-            let room = null;
-            if (roomShops.length) room = roomShops[Math.floor(Math.random() * roomShops.length)];
-            let rx, rz, dx, dz, roomW, roomD;
-            if (room) {
-                const d = room.data;
-                roomW = Math.max(6, (d.w || 12) * 0.6), roomD = Math.max(6, (d.d || 12) * 0.6);
-                rx = (Math.random() - 0.5) * roomW; rz = (Math.random() - 0.5) * roomD;
-                dx = (Math.random() - 0.5) * 1.6; dz = (Math.random() - 0.5) * 1.6;
-            } else {
-                rx = (Math.random() - 0.5) * W * 0.6; rz = (Math.random() - 0.5) * D * 0.6;
-                dx = (Math.random() - 0.5) * 3; dz = (Math.random() - 0.5) * 3;
-                roomW = W * 0.6; roomD = D * 0.6;
-            }
-            liveState.demoTimer = setInterval(() => {
-                dx += (Math.random() - 0.5) * 1.2; dz += (Math.random() - 0.5) * 1.2;
-                const mx = roomW / 2 - 2, mz = roomD / 2 - 2;
-                rx = Math.max(-mx, Math.min(mx, rx + dx));
-                rz = Math.max(-mz, Math.min(mz, rz + dz));
-                if (Math.abs(rx) >= mx || Math.abs(rz) >= mz) { dx = -dx * 0.5; dz = -dz * 0.5; }
-                if (Math.random() < 0.05 && floorData && floorData.length > 1) {
-                    fi = (fi + (Math.random() < 0.5 ? -1 : 1) + floorData.length) % floorData.length;
-                    const fl2 = indoor.floors && indoor.floors[fi];
-                    if (fl2 && fl2.shops && fl2.shops.length) {
-                        room = fl2.shops[Math.floor(Math.random() * fl2.shops.length)];
-                        const d2 = room.data;
-                        roomW = Math.max(6, (d2.w || 12) * 0.6), roomD = Math.max(6, (d2.d || 12) * 0.6);
-                        rx = (Math.random() - 0.5) * roomW; rz = (Math.random() - 0.5) * roomD;
-                    }
-                }
-                if (room) {
-                    pushLivePoint(rx, rz, fi, Date.now(), room.data.name); // 房间内相对坐标 + 房间名 → 自动换算场景坐标
-                } else {
-                    pushLivePoint(rx, rz, fi, Date.now(), null, true);     // 无房间：rx/rz 直接作为场景坐标
-                }
-            }, interval || 800);
-            updateStatus(room ? ('实时位置演示已启动（在「' + room.data.name + '」内游走）') : '实时位置演示已启动（随机游走）', 'loading');
-        }
-        function stopLiveDemo() {
-            if (liveState.demoTimer) { clearInterval(liveState.demoTimer); liveState.demoTimer = null; }
-        }
-
-        // ===== 后端对接层：把后端(HTTP/WS)的数据统一接入前端 =====
-        // 后端就绪后只需填 LIVE_BACKEND 并调用 connectBackend()，或在前端面板填地址点「连接后端」
-        // 约定数据格式（后端按此返回）：
-        //   单条：{ id?, x, z, floor?, room?, ts?, abs? }
-        //   多条：{ positions: [...] } 或 [ ... ]
-        //   带 room → 房间级实时轨迹(roomPush)；不带 → 建筑级实时轨迹(pushLivePoint)
-        //   id：用户标识（不传则默认 u1）；abs=true 时 x/z 为建筑场景坐标，否则为房间内相对坐标
-        const LIVE_BACKEND = {
-            enabled: false,   // 默认关；面板点「连接后端」或 connectBackend() 后置 true
-            url: '',          // http(s)://... 走轮询；ws(s)://... 走 WebSocket
-            interval: 2000,   // HTTP 轮询间隔
-            ws: null,         // WebSocket 实例（运行时）
-            wsTimer: null,    // 断线重连定时器
-            httpTimer: null,  // HTTP 轮询定时器
-            httpAbort: null   // 当前 fetch 的 AbortController（避免重叠请求）
-        };
-        // 统一入口：解析后端下发的数据并分流
-        function ingestLiveData(payload) {
-            let list = [];
-            if (Array.isArray(payload)) list = payload;
-            else if (payload && Array.isArray(payload.positions)) list = payload.positions;
-            else if (payload && typeof payload === 'object' && typeof payload.x === 'number') list = [payload];
-            if (!list.length) return 0;
-            let n = 0;
-            list.forEach(p => {
-                if (!p || typeof p.x !== 'number' || typeof p.z !== 'number') return;
-                const id = p.id || 'u1';
-                if (p.room) roomPush(id, p.x, p.z, p.ts);        // 房间级
-                else pushLivePoint(p.x, p.z, p.floor, p.ts, p.room, p.abs); // 建筑级
-                n++;
-            });
-            return n;
-        }
-        // HTTP 轮询后端：GET url 拿 JSON
-        function backendHttpTick() {
-            const url = LIVE_BACKEND.url;
-            if (!url || !LIVE_BACKEND.enabled) return;
-            if (LIVE_BACKEND.httpAbort) LIVE_BACKEND.httpAbort.abort();
-            const ac = new AbortController();
-            LIVE_BACKEND.httpAbort = ac;
-            fetch(url, { signal: ac.signal })
-                .then(r => r.json())
-                .then(data => { ingestLiveData(data); })
-                .catch(() => { /* 网络抖动静默，下一轮重试 */ });
-        }
-        function startBackendHttp() {
-            stopBackendHttp();
-            LIVE_BACKEND.httpTimer = setInterval(backendHttpTick, LIVE_BACKEND.interval);
-            backendHttpTick();
-            updateStatus('后端已连接（HTTP 轮询）：' + LIVE_BACKEND.url, 'success');
-        }
-        function stopBackendHttp() {
-            if (LIVE_BACKEND.httpTimer) { clearInterval(LIVE_BACKEND.httpTimer); LIVE_BACKEND.httpTimer = null; }
-            if (LIVE_BACKEND.httpAbort) { LIVE_BACKEND.httpAbort.abort(); LIVE_BACKEND.httpAbort = null; }
-        }
-        // WebSocket 后端：实时推送，断线 3s 自动重连
-        function startBackendWs() {
-            stopBackendWs();
-            let ws;
-            try { ws = new WebSocket(LIVE_BACKEND.url); } catch (e) { updateStatus('WebSocket 地址不合法：' + LIVE_BACKEND.url, 'error'); return; }
-            LIVE_BACKEND.ws = ws;
-            ws.onopen = () => updateStatus('后端已连接（WebSocket）：' + LIVE_BACKEND.url, 'success');
-            ws.onmessage = (ev) => {
-                try { ingestLiveData(JSON.parse(ev.data)); } catch (e) { /* 非 JSON 消息忽略 */ }
-            };
-            ws.onclose = () => {
-                if (!LIVE_BACKEND.enabled) return;
-                updateStatus('后端连接断开，3 秒后重连…', 'loading');
-                LIVE_BACKEND.wsTimer = setTimeout(() => { if (LIVE_BACKEND.enabled) startBackendWs(); }, 3000);
-            };
-            ws.onerror = () => { try { ws.close(); } catch (e) {} };
-        }
-        function stopBackendWs() {
-            if (LIVE_BACKEND.wsTimer) { clearTimeout(LIVE_BACKEND.wsTimer); LIVE_BACKEND.wsTimer = null; }
-            if (LIVE_BACKEND.ws) { try { LIVE_BACKEND.ws.onclose = null; LIVE_BACKEND.ws.close(); } catch (e) {} LIVE_BACKEND.ws = null; }
-        }
-        // 连接/断开后端（面板按钮与 API 共用）
-        function connectBackend() {
-            if (LIVE_BACKEND.enabled) return;
-            if (!LIVE_BACKEND.url) {
-                const el = document.getElementById('lbBackendUrl');
-                LIVE_BACKEND.url = el ? el.value.trim() : '';
-            }
-            if (!LIVE_BACKEND.url) { updateStatus('请先填写后端地址（http 轮询 或 ws 推送）', 'error'); return; }
-            LIVE_BACKEND.enabled = true;
-            const isWs = /^wss?:\/\//i.test(LIVE_BACKEND.url);
-            if (isWs) startBackendWs(); else startBackendHttp();
-            updateBackendUi();
-        }
-        function disconnectBackend() {
-            if (!LIVE_BACKEND.enabled) return;
-            LIVE_BACKEND.enabled = false;
-            stopBackendHttp(); stopBackendWs();
-            updateStatus('已断开后端连接', 'loading');
-            updateBackendUi();
-        }
-        function toggleBackend() { LIVE_BACKEND.enabled ? disconnectBackend() : connectBackend(); }
-        function updateBackendUi() {
-            const b = document.getElementById('lbBackendBtn');
-            if (b) b.textContent = LIVE_BACKEND.enabled ? '断开后端' : '连接后端';
-        }
 
         // ===== 定位系统后端对接（FastAPI 标签定位服务） =====
         // 协议：POST /api/v1/auth/login {username,password} → {access_token}
@@ -3797,78 +3294,6 @@
             const b = document.getElementById('posConnBtn');
             if (b) b.textContent = POS_BACKEND.enabled ? '断开定位后端' : '连接定位后端';
         }
-
-        // HTTP JSON 轮询：期望 {x,z,floor,ts} 或 {current:{...}} 或 数组（取最后一项）
-        function startLivePolling(url, interval) {
-            stopLivePolling();
-            if (!url) {
-                const el = document.getElementById('lbPollUrl');
-                url = el ? el.value.trim() : '';
-            }
-            if (!url) { updateStatus('请先填写 JSON 接口地址', 'error'); return; }
-            liveState.pollUrl = url;
-            const iv = interval || 2000;
-            const tick = () => {
-                fetch(url).then(r => r.json()).then(data => {
-                    let pt = data;
-                    if (data && typeof data === 'object') {
-                        if (data.current && typeof data.current.x === 'number') pt = data.current;
-                        else if (Array.isArray(data) && data.length) pt = data[data.length - 1];
-                    }
-                    if (pt && typeof pt.x === 'number' && typeof pt.z === 'number') {
-                        pushLivePoint(pt.x, pt.z, pt.floor, pt.ts, pt.room, pt.abs);
-                    }
-                }).catch(() => { /* 网络错误静默，下一轮重试 */ });
-            };
-            tick();
-            liveState.pollTimer = setInterval(tick, iv);
-            updateStatus('实时位置轮询已启动：' + url, 'success');
-        }
-        function stopLivePolling() {
-            if (liveState.pollTimer) { clearInterval(liveState.pollTimer); liveState.pollTimer = null; }
-            const pb = document.getElementById('lbPollBtn');
-            if (pb) pb.textContent = '开始轮询';
-        }
-        function toggleLivePolling() {
-            if (liveState.pollTimer) {
-                stopLivePolling();
-                updateStatus('已停止轮询', 'loading');
-            } else {
-                startLivePolling();
-            }
-            const pb = document.getElementById('lbPollBtn');
-            if (pb) pb.textContent = liveState.pollTimer ? '停止轮询' : '开始轮询';
-        }
-        // 外部 iframe / 父页面 postMessage 推送：{ type:'indoor-live', data:{x,z,floor,ts,room,abs} } 或 { type:'indoor-live', positions:[...] }
-        window.addEventListener('message', function (ev) {
-            const d = ev.data;
-            if (!d || d.type !== 'indoor-live') return;
-            if (d.positions) { ingestLiveData(d.positions); return; }
-            if (d.data && typeof d.data.x === 'number' && typeof d.data.z === 'number') {
-                pushLivePoint(d.data.x, d.data.z, d.data.floor, d.data.ts, d.data.room, d.data.abs);
-            }
-        });
-        // 对外统一 API（外部脚本 / 控制台 / iframe 均可调用）
-        // room：店铺名或 id（可选）；abs=true 时 x/z 为建筑场景坐标，否则为房间内相对坐标（以房间中心为原点）
-        window.IndoorLiveAPI = {
-            push(point) {
-                if (!point || typeof point.x !== 'number' || typeof point.z !== 'number') {
-                    return { ok: false, msg: '需要 {x, z, floor?, ts?, room?}，且 x/z 为数字' };
-                }
-                return pushLivePoint(point.x, point.z, point.floor, point.ts, point.room, point.abs);
-            },
-            clear() { clearLiveTrace(); return { ok: true }; },
-            getState() { return { count: liveState.points.length, current: liveState.current, points: liveState.points.slice(-100) }; },
-            setPolling(url, interval) { startLivePolling(url, interval); },
-            stopPolling() { stopLivePolling(); },
-            startDemo(interval) { startLiveDemo(interval); },
-            stopDemo() { stopLiveDemo(); },
-            // 后端对接
-            setBackend(url, interval) { LIVE_BACKEND.url = url; if (interval) LIVE_BACKEND.interval = interval; const el = document.getElementById('lbBackendUrl'); if (el) el.value = url; },
-            connect() { connectBackend(); },
-            disconnect() { disconnectBackend(); },
-            ingest(data) { return ingestLiveData(data); }
-        };
 
         // ===== 房间级 3D 建模：点击店铺进入房间视图 + 上传房间内部数据 =====
         // 数据模型：roomModels[房间名] = { items:[{name,cat,x,z,w,d,h,shape,rot}], walls:[{x1,z1,x2,z2}] }
@@ -4151,11 +3576,20 @@
             renderRoomLivePanel();
             return { ok: true, uid: String(uid || 'u1'), count: u.points.length };
         }
-        // 刷新房间实时位置面板（用户列表）
+        // 刷新房间实时位置面板（用户列表）与顶部主功能条统计
         function renderRoomLivePanel() {
             const list = document.getElementById('rlUsers');
             const total = document.getElementById('rlTotal');
             if (total) total.textContent = roomLive.order.length;
+            // 顶部主功能条统计
+            const ro = document.getElementById('rtOnline');
+            const rp = document.getElementById('rtPts');
+            if (ro) ro.textContent = roomLive.order.length;
+            if (rp) {
+                let n = 0;
+                roomLive.order.forEach(uid => { const u = roomLive.users[uid]; if (u) n += u.points.length; });
+                rp.textContent = n;
+            }
             if (!list) return;
             let html = '';
             roomLive.order.forEach(uid => {
@@ -4165,6 +3599,10 @@
                 html += `<div class="rl-row"><span style="display:inline-flex;align-items:center;gap:6px;"><i style="width:9px;height:9px;border-radius:50%;background:#${col.toString(16).padStart(6,'0')};display:inline-block;"></i>${uid}</span><b>${c ? (c.x + ', ' + c.z) : '—'}</b></div>`;
             });
             list.innerHTML = html || '<div class="rl-row"><span>暂无用户</span><b>—</b></div>';
+        }
+        function roomStopDemo() {
+            if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; }
+            updateStatus('已停止多用户游走演示', 'loading');
         }
         function roomClearLive(uid) {
             if (uid) {
@@ -4326,7 +3764,7 @@
                 return { room: roomScene.active ? roomScene.name : null, online: roomLive.order.length, users: users };
             },
             startDemo() { roomDemo(); return { ok: true }; },
-            stopDemo() { if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; } return { ok: true }; },
+            stopDemo() { roomStopDemo(); return { ok: true }; },
             // 定位系统后端对接：connect({username, password}) / disconnect()
             async connect(cfg) {
                 if (cfg) {
@@ -4342,6 +3780,22 @@
 
         // ===== 室内 3D 建模自定义（全局面板控制） =====
         const _DEFAULT_INDOOR_CONFIG = { W: 140, D: 100, FH: 20, COLS: 8, ROWS: 6, atrium: true, labels: true, autoRotate: false, footprint: null };
+        const ED_CONFIG_KEY = 'indoor3d_edConfig'; // 用户要求的持久化 key
+        // 读取 localStorage 的编辑配置（失败回默认；演示模式不受影响——旧 key 缺失则用默认）
+        try {
+            const _saved = localStorage.getItem(ED_CONFIG_KEY);
+            if (_saved) {
+                const _o = JSON.parse(_saved);
+                if (_o && typeof _o === 'object') {
+                    if (_o.indoorConfig) indoorConfig = Object.assign({}, _DEFAULT_INDOOR_CONFIG, _o.indoorConfig);
+                    if (_o.indoorEdit) indoorEdit = _o.indoorEdit;
+                }
+            }
+        } catch (e) { /* 旧数据损坏则忽略 */ }
+        // 持久化当前编辑配置（写入失败静默）
+        function saveEdConfig() {
+            try { localStorage.setItem(ED_CONFIG_KEY, JSON.stringify({ indoorConfig: indoorConfig, indoorEdit: indoorEdit })); } catch (e) {}
+        }
 
         function toggleCustomPanel() {
             const p = document.getElementById('customPanel');
@@ -4422,6 +3876,7 @@
             fe.atrium = chk('cfgAtrium');
             updateStatus('已应用到「' + fName + '」层，正在重建 3D 场景…', 'success');
             markQS('size');
+            saveEdConfig();
             rebuildIndoor();
         }
         function resetCustomConfig() {
@@ -4430,6 +3885,7 @@
             syncCustomPanel();
             updateStatus('已重置为默认建模参数', 'success');
             markQS('size');
+            saveEdConfig();
             rebuildIndoor();
         }
         function rebuildIndoor() {
@@ -4534,7 +3990,7 @@
                 updateStatus('轮廓至少需要 3 个角点，已取消绘制', 'error');
             }
             endDrawFootprint();
-            if (ok) rebuildIndoor();
+            if (ok) { saveEdConfig(); rebuildIndoor(); }
         }
         function cancelDrawFootprint() {
             endDrawFootprint();
@@ -4612,6 +4068,7 @@
             editSelShopId = id;
             updateSelectedShopControls();
             updateStatus('已新增并选中店铺：右侧可切换形状 / 调尺寸 / 调朝向，在 3D 中按住该店可拖动', 'success');
+            saveEdConfig();
         }
         function deleteSelectedShop() {
             if (!editSelShopId) { updateStatus('请先点选一个店铺', 'error'); return; }
@@ -4628,6 +4085,7 @@
             }
             editSelShopId = null;
             updateStatus('已删除选中店铺', 'success');
+            saveEdConfig();
             rebuildIndoor();
         }
         function undoSelectedShop() {
@@ -4636,6 +4094,7 @@
             if (fe.shopOverrides) delete fe.shopOverrides[editSelShopId];
             editSelShopId = null;
             updateStatus('已复位选中店铺到默认位置/品类', 'success');
+            saveEdConfig();
             rebuildIndoor();
         }
         function recolorSelectedShop(cat) {
@@ -4734,13 +4193,14 @@
         }
         function undoLastWall() {
             const fe = floorEdit(curFloorName());
-            if (fe.walls && fe.walls.length) { fe.walls.pop(); updateStatus('已撤销一段内墙', 'success'); rebuildIndoor(); }
+            if (fe.walls && fe.walls.length) { fe.walls.pop(); saveEdConfig(); updateStatus('已撤销一段内墙', 'success'); rebuildIndoor(); }
             else updateStatus('本层没有可撤销的墙', 'error');
         }
         function clearFloorWalls() {
             const fe = floorEdit(curFloorName());
             fe.walls = [];
             updateStatus('已清空本层内墙', 'success');
+            saveEdConfig();
             rebuildIndoor();
         }
         // 一键清空建筑内全部建模（店铺/内墙/设施/轮廓），便于从头设计
@@ -4755,6 +4215,7 @@
             syncCustomPanel();
             updateStatus('已清空全部建模，可重新设计', 'success');
             markQS('size');
+            saveEdConfig();
             rebuildIndoor();
         }
         // 一键生成默认/真实自动店铺网格（清空后的反向操作），保留用户已有自定义店铺/墙/设施
@@ -4764,6 +4225,7 @@
             syncCustomPanel();
             updateStatus('已生成默认建模网格，可继续编辑', 'success');
             markQS('shop');
+            saveEdConfig();
             rebuildIndoor();
         }
 
@@ -5098,19 +4560,22 @@
             <div class="top-right">
                 <span class="mode-badge" id="roomModeBadge">房间 3D 模式</span>
                 <button class="hud-btn" onclick="openRoomDataModal()">房间数据上传</button>
-                <button class="hud-btn tut-btn" onclick="loadRoomDemo()">演示小球</button>
                 <button class="return-btn" onclick="exitRoom3D()">← 返回建筑</button>
             </div>
+        </div>
+        <!-- 顶部主功能条：多用户实时轨迹（显眼入口，点击演示/接入后端） -->
+        <div class="hud room-trackbar" id="roomTrackBar">
+            <div class="rt-title">多用户轨迹</div>
+            <button class="rt-btn primary" onclick="roomDemo()">演示 3 人游走</button>
+            <button class="rt-btn" onclick="roomStopDemo()">停止</button>
+            <button class="rt-btn danger" onclick="roomClearLive()">清空</button>
+            <span class="rt-stat">在线 <b id="rtOnline">0</b> 人 · 轨迹 <b id="rtPts">0</b> 点</span>
         </div>
         <!-- 左下：实时位置（多用户小圆球）面板 -->
         <div class="hud room-livebox" id="roomLiveBox">
             <div class="rl-title">用户实时位置（小圆球） · 在线 <b id="rlTotal">0</b> 人</div>
             <div class="rl-users" id="rlUsers">
                 <div class="rl-row"><span>暂无用户</span><b>—</b></div>
-            </div>
-            <div class="rl-ctrl">
-                <button class="rl-btn" onclick="roomDemo()">随机游走演示（3 人）</button>
-                <button class="rl-btn danger" onclick="roomClearLive()">清除全部轨迹</button>
             </div>
             <div style="margin-top:8px;font-size:11px;color:var(--hud-text-2);line-height:1.7;">
                 调用：<code>IndoorRoomAPI.push({id:'用户A', x:1.5, z:-0.8})</code>（id 缺省为 u1；同房间多用户各自独立轨迹）
