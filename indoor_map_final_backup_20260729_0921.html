@@ -988,6 +988,10 @@
                             <h4>北京西单大悦城</h4>
                             <p>西城区西单北大街131号</p>
                         </div>
+                        <div class="building-item" data-building="B000A_JIRUI" data-name="杭州吉瑞国际" data-lng="120.158955" data-lat="30.325983">
+                            <h4>杭州吉瑞国际</h4>
+                            <p>拱墅区科园路55号（14F 会议室定位演示）</p>
+                        </div>
                     </div>
                 </div>
                 
@@ -1288,6 +1292,13 @@
                 { name: 'B1', display: 'B1层', type: 'shopping', desc: '数码电器' },
                 { name: 'B2', display: 'B2层', type: 'parking', desc: '停车场' },
                 { name: 'B3', display: 'B3层', type: 'parking', desc: '停车场' }
+            ],
+            'B000A_JIRUI': [ // 杭州吉瑞国际大厦（mock 楼层含 14F 会议室，用于定位轨迹演示）
+                { name: 'L10', display: '10层', type: 'office', desc: '办公区' },
+                { name: 'L11', display: '11层', type: 'office', desc: '办公区' },
+                { name: 'L12', display: '12层', type: 'office', desc: '办公区' },
+                { name: 'L13', display: '13层', type: 'office', desc: '办公区' },
+                { name: 'L14', display: '14层', type: 'office', desc: '办公层（含会议室、定位演示房间）' }
             ]
         };
         
@@ -2096,7 +2107,8 @@
             shopping:      { color: 0x3b82f6, label: '购物', css: '#3b82f6' },
             dining:        { color: 0xf59e0b, label: '餐饮', css: '#f59e0b' },
             entertainment: { color: 0x4ade80, label: '娱乐', css: '#4ade80' },
-            parking:       { color: 0x9ca3af, label: '停车', css: '#9ca3af' }
+            parking:       { color: 0x9ca3af, label: '停车', css: '#9ca3af' },
+            office:        { color: 0x8b5cf6, label: '办公', css: '#8b5cf6' }
         };
         // 3D 建模可自定义参数（用户可在「自定义」面板中调整）
         let indoorConfig = {
@@ -2448,7 +2460,8 @@
             // ===== 逐层楼板 + 半透明外墙（按本层轮廓）+ 店铺/墙/设施 =====
             const useReal = !!(realIndoorShops && realIndoorShops.available);
             // 一键清空标记：置位后不再生成默认/真实自动店铺网格，仅保留楼体壳与用户手动新增店铺
-            const cleared = !!(indoorEdit && indoorEdit.cleared);
+            // 吉瑞国际强制 cleared：整栋只保留 L14 自动追加的「会议室」，其余楼层仅楼体壳
+            const cleared = !!(indoorEdit && indoorEdit.cleared) || currentBuilding === 'B000A_JIRUI';
             const floors = [];
 
             floorsData.forEach((f, fi) => {
@@ -2536,6 +2549,33 @@
                     }
                 }
                 } // end if(!cleared)：已清空时跳过默认/真实自动店铺网格
+                // 杭州吉瑞国际大厦 L14 中央自动追加「会议室」店铺（点击进入房间页加载预置模型）
+                // 注意：shopH 是 if(!cleared) 块内 const，此处块外不可引用，用局部常量
+                if (currentBuilding === 'B000A_JIRUI' && f.name === 'L14') {
+                    const roomShopId = 's_meeting_14';
+                    const ov = fc.shopOverrides[roomShopId];
+                    if (!(ov && ov.deleted)) {
+                        const roomShopH = FH * 0.62;
+                        const localY = -FH / 2 + 2 + roomShopH / 2;
+                        const sw = 50, sd = 40; // 占楼层中央大区域
+                        const mat = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, emissive: 0x8b5cf6, emissiveIntensity: 0.18, metalness: 0.3, roughness: 0.5, transparent: true, opacity: 0.95 });
+                        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sw, roomShopH, sd), mat);
+                        mesh.position.set(0, localY, 0);
+                        const data = { id: roomShopId, name: '会议室', cat: 'office', floor: f.display, desc: '14F 会议室 · 定位轨迹演示房间（点击进入）', real: false, w: sw, d: sd, shape: 'rect', rot: 0 };
+                        mesh.userData = { shop: data, id: roomShopId, kind: 'shop', floor: f.name };
+                        group.add(mesh);
+                        let label = null;
+                        if (labels) {
+                            const labelDiv = document.createElement('div');
+                            labelDiv.textContent = '会议室';
+                            labelDiv.style.cssText = 'color:#fff;font-size:13px;font-weight:700;background:rgba(139,92,246,.9);padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.3);white-space:nowrap;pointer-events:none;';
+                            label = new THREE.CSS2DObject(labelDiv);
+                            label.position.set(0, localY + roomShopH / 2 + 1, 0);
+                            group.add(label);
+                        }
+                        shops.push({ mesh, label, data, world: new THREE.Vector3(0, fi * FH + localY, 0) });
+                    }
+                }
                 // 用户新增店铺
                 fc.customShops.forEach(cs => {
                     const meta = CAT_META[cs.cat];
@@ -3199,10 +3239,17 @@
 
         // ===== 定位系统后端对接（FastAPI 标签定位服务） =====
         // 协议：POST /api/v1/auth/login {username,password} → {access_token}
-        //      GET  /api/v1/tags/positions (Bearer) → [{device_id, name, position:{x,y,z,reported_at}|null}]
+        //      GET  /api/v1/tags/positions (Bearer) → [{device_id, name, project_id, project_name, status, last_report_time, position:{x,y,z,reported_at,battery}|null}]
+        //      GET  /api/v1/tags → 标签列表（keyword/status/project_id 过滤）
+        //      GET  /api/v1/tags/{device_id}/positions → 单标签历史轨迹（分页）
+        //      GET  /api/v1/tags/{device_id}/events   → 单标签事件历史（分页）
+        //      GET  /api/v1/events                    → 全局事件（device_id/event_type/start/end 过滤）
         // 坐标映射：后端 x/y 平面 → 前端 x/z（y 当 z 用）；device_id 作为多用户 id
         const POS_BACKEND = {
-            enabled: false, token: null, timer: null, base: ''
+            enabled: false, token: null, timer: null, base: '',
+            tags: [],            // 最近一次 /tags/positions 的原始列表缓存（供列表渲染）
+            evTimer: null,       // 全局事件轮询定时器
+            historyLine: null    // 单标签历史轨迹线（房间 3D 场景内）
         };
         function posApi(path, opts) {
             const headers = { 'Content-Type': 'application/json' };
@@ -3242,6 +3289,7 @@
             if (!res.ok) { setPosStatus('拉取位置失败（HTTP ' + res.status + '）'); return; }
             const list = await res.json();
             if (!Array.isArray(list)) { setPosStatus('返回格式异常'); return; }
+            POS_BACKEND.tags = list;
             let n = 0;
             list.forEach(t => {
                 if (!t || !t.position) return;
@@ -3253,6 +3301,7 @@
             });
             // 标签坐标可能超出房间范围：按当前用户坐标包围盒检查是否需要扩大重建
             fitRoomToUsers();
+            renderPosTags();
             setPosStatus('已连接，' + list.length + ' 个标签，本轮更新 ' + n + ' 个位置');
         }
         // 房间尺寸按所有用户坐标调整：放不下就重建（数据在 roomLive.users 里保留）
@@ -3277,6 +3326,8 @@
                 POS_BACKEND.enabled = true;
                 posPoll();
                 POS_BACKEND.timer = setInterval(posPoll, 2000);
+                posPollEvents();
+                POS_BACKEND.evTimer = setInterval(posPollEvents, 5000);
                 setPosStatus('已连接：' + POS_BACKEND.base);
             } catch (e) {
                 setPosStatus(e.message || '连接失败');
@@ -3285,7 +3336,12 @@
         }
         function disconnectPosBackend() {
             if (POS_BACKEND.timer) { clearInterval(POS_BACKEND.timer); POS_BACKEND.timer = null; }
-            POS_BACKEND.enabled = false; POS_BACKEND.token = null;
+            if (POS_BACKEND.evTimer) { clearInterval(POS_BACKEND.evTimer); POS_BACKEND.evTimer = null; }
+            POS_BACKEND.enabled = false; POS_BACKEND.token = null; POS_BACKEND.tags = [];
+            clearPosHistoryLine();
+            const tags = document.getElementById('posTags'); if (tags) tags.innerHTML = '';
+            const dt = document.getElementById('posTagDetail'); if (dt) dt.innerHTML = '';
+            const ev = document.getElementById('posEvents'); if (ev) ev.innerHTML = '';
             setPosStatus('未连接');
             updatePosUi();
         }
@@ -3293,6 +3349,107 @@
         function updatePosUi() {
             const b = document.getElementById('posConnBtn');
             if (b) b.textContent = POS_BACKEND.enabled ? '断开定位后端' : '连接定位后端';
+        }
+
+        // ===== 客户端角色接口：标签列表 / 单标签轨迹 / 事件 / 全局事件 =====
+        const POS_STATUS_META = {
+            online:     { label: '在线',     color: '#4ade80' },
+            offline:    { label: '离线',     color: '#9ca3af' },
+            registered: { label: '已注册',   color: '#60a5fa' },
+            disabled:   { label: '已禁用',   color: '#f87171' }
+        };
+        function posStatusBadge(st) {
+            const m = POS_STATUS_META[st] || { label: st, color: '#9ca3af' };
+            return `<span style="color:${m.color};font-weight:700;">●</span> ${m.label}`;
+        }
+        // 渲染标签状态列表（数据来自最近一次 /tags/positions）
+        function renderPosTags() {
+            const box = document.getElementById('posTags');
+            if (!box) return;
+            if (!POS_BACKEND.enabled) { box.innerHTML = ''; return; }
+            const list = POS_BACKEND.tags || [];
+            if (!list.length) { box.innerHTML = '<span style="color:var(--hud-text-2);">暂无标签数据</span>'; return; }
+            box.innerHTML = list.map(t => {
+                const p = t.position;
+                const bat = (p && p.battery != null) ? (p.battery + '%') : '—';
+                return `<div class="rl-row" style="cursor:pointer;" onclick="posTagDetail('${t.device_id}')" title="点击查看轨迹与事件">
+                    <span>${posStatusBadge(t.status)} ${t.device_id}${t.name ? ' · ' + t.name : ''}</span>
+                    <b>${bat}</b>
+                </div>`;
+            }).join('');
+        }
+        // 单标签详情：拉历史轨迹 + 事件，画轨迹线到房间 3D
+        async function posTagDetail(device_id) {
+            const box = document.getElementById('posTagDetail');
+            if (!box || !POS_BACKEND.enabled) return;
+            box.innerHTML = '加载「' + device_id + '」数据…';
+            const q = '?page_size=200';
+            let tr = null, ev = null;
+            try {
+                [tr, ev] = await Promise.all([
+                    posApi('/api/v1/tags/' + encodeURIComponent(device_id) + '/positions' + q).then(r => r.ok ? r.json() : null),
+                    posApi('/api/v1/tags/' + encodeURIComponent(device_id) + '/events' + q).then(r => r.ok ? r.json() : null)
+                ]);
+            } catch (e) { box.innerHTML = '拉取失败：' + (e.message || e); return; }
+            // 轨迹线画到房间场景（后端 y→z 映射）
+            clearPosHistoryLine();
+            if (tr && tr.items && tr.items.length >= 2 && roomScene.scene) {
+                const verts = tr.items.map(p => new THREE.Vector3(p.x, 0.9, p.y));
+                const line = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints(verts),
+                    new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.9 })
+                );
+                roomScene.scene.add(line);
+                POS_BACKEND.historyLine = line;
+            }
+            const items = (ev && ev.items || []).slice(0, 8);
+            const evHtml = items.length ? items.map(e =>
+                `<span style="color:#9ab;">[${(e.created_at || '').slice(5, 16)}] ${e.event_type}</span> ${e.message || ''}`).join('<br>')
+                : '<span style="color:var(--hud-text-2);">暂无事件</span>';
+            box.innerHTML =
+                `<div style="border:1px solid rgba(251,191,36,.4);border-radius:6px;padding:6px 8px;margin-top:4px;">` +
+                `<b style="color:#fbbf24;">${device_id}</b> · 历史轨迹 ${(tr && tr.total) || 0} 点` +
+                (POS_BACKEND.historyLine ? ' <button class="rl-btn" onclick="clearPosHistoryLine()" style="padding:2px 8px;font-size:10px;">清除轨迹线</button>' : '') +
+                `</div>` +
+                `<div style="margin-top:4px;">最近事件：<br>${evHtml}</div>`;
+        }
+        // 清除单标签历史轨迹线
+        function clearPosHistoryLine() {
+            if (POS_BACKEND.historyLine && roomScene.scene) {
+                roomScene.scene.remove(POS_BACKEND.historyLine);
+                POS_BACKEND.historyLine = null;
+            }
+        }
+        // 手动刷新标签列表（调 /tags 全量列表，含 keyword/status 过滤；返回 TagOut 数组）
+        async function posRefreshTags() {
+            if (!POS_BACKEND.enabled) return;
+            try {
+                const r = await posApi('/api/v1/tags?page_size=100');
+                if (!r.ok) { setPosStatus('刷新标签列表失败（HTTP ' + r.status + '）'); return; }
+                const d = await r.json();
+                const list = Array.isArray(d) ? d : ((d && Array.isArray(d.items)) ? d.items : []);
+                POS_BACKEND.tags = list.map(t => ({
+                    device_id: t.device_id, name: t.name, status: t.status, position: null, last_report_time: t.last_report_time
+                }));
+                renderPosTags();
+                setPosStatus('标签列表已刷新（' + list.length + ' 个）');
+            } catch (e) { setPosStatus('刷新失败：' + (e.message || e)); }
+        }
+        // 全局事件轮询（每 5s，最新 8 条，用于观察上线/离线）
+        async function posPollEvents() {
+            if (!POS_BACKEND.enabled || !POS_BACKEND.token) return;
+            const box = document.getElementById('posEvents');
+            if (!box) return;
+            try {
+                const r = await posApi('/api/v1/events?page_size=8');
+                if (!r.ok) return;
+                const d = await r.json();
+                const items = (d && Array.isArray(d.items)) ? d.items : (Array.isArray(d) ? d : []);
+                if (!items.length) { box.innerHTML = '<span style="color:var(--hud-text-2);">暂无全局事件</span>'; return; }
+                box.innerHTML = '<span style="color:var(--hud-text-2);font-weight:700;">全局事件</span><br>' + items.map(e =>
+                    `<span style="color:#9ab;">[${(e.created_at || '').slice(5, 16)}] ${e.device_id || ''}</span> ${e.event_type} ${e.message || ''}`
+                ).join('<br>');
+            } catch (e) {}
         }
 
         // ===== 房间级 3D 建模：点击店铺进入房间视图 + 上传房间内部数据 =====
@@ -3306,6 +3463,68 @@
             other:     { label: '其他', color: 0x9ca3af }
         };
         let roomModels = {};        // 房间内部数据（跨重建持久化）：{ items, walls }
+        // ===== 预置房间：会议室（杭州吉瑞国际大厦 14F，用于定位轨迹演示） =====
+        // 坐标系：房间中心 (0,0)，单位米
+        // 房间尺寸按 4 个基站坐标推算：x 跨度 0.41~5.28(4.87m)、y 跨度 0.41~7.35(6.94m，y→前端 z)
+        // 房间中心 = 基站中心 (2.845, 3.88)，四角各留 ~0.55m 边距 → size = 6×8
+        roomModels['会议室'] = {
+            size: { w: 6, d: 8 },   // 房间外壳固定 6×8，保证 4 基站贴角、小球活动范围与真实房间一致
+            // 严格按参考图：桌长边沿 x（水平方向），与电视柜（贴左墙、沿 z）互相垂直；
+            // 10 把椅子在桌子南北两侧（沿 x 排列，每侧 5 把），5 把等候椅沿右墙（沿 x 排列）
+            items: [
+                // ── 顶部（北墙 z≈+3.7）──
+                // 顶部偏右深色储物柜（沿 x 方向长，约 2m）
+                { name: '储物柜', cat: 'furniture', x:  1.4, z:  3.55, w: 1.8, d: 0.5, h: 0.9 },
+                // 顶部偏左白色门 / 白板（独立白色矩形，北墙方向）
+                { name: '白板',   cat: 'furniture', x: -0.6, z:  3.75, w: 1.0, d: 0.2, h: 0.06 },
+
+                // ── 左上角（西北）：圆形绿植（叶子小盆栽）──
+                { name: '绿植',   cat: 'decor',     x: -2.6, z:  2.7,  w: 0.5, d: 0.5, h: 0.7, shape: 'circle' },
+
+                // ── 左墙（西墙 x≈-3）：挂墙电视 + 黑色电视柜（沿 z 方向，正中央 z=0）──
+                { name: '电视',   cat: 'device',    x: -2.78, z: 0,    w: 0.06, d: 1.7, h: 0.95 },
+                { name: '电视柜', cat: 'furniture', x: -2.45, z: 0,    w: 0.45, d: 1.1, h: 0.55 },
+
+                // ── 中央会议桌：长边沿 x 方向（水平方向） ──
+                { name: '会议桌', cat: 'furniture', x: 0,    z: 0,    w: 4.2, d: 1.6, h: 0.75 },
+                // 桌面中央浅色窄长条（会议板 / 桌旗），沿 x 方向等长延伸
+                { name: '会议板', cat: 'furniture', x: 0,    z: 0,    w: 3.6, d: 0.28, h: 0.05 },
+
+                // ── 桌面物品（按图：左侧笔记本、中央圆形装饰物、4 个白色方垫）──
+                { name: '笔记本',  cat: 'device',  x: -1.55, z: -0.35, w: 0.55, d: 0.4, h: 0.03 },
+                { name: '装饰物',  cat: 'decor',   x: -0.4,  z: 0.05,  w: 0.32, d: 0.32, h: 0.18, shape: 'circle' },
+                { name: '白方垫',  cat: 'decor',   x: -1.0,  z:  0.45, w: 0.32, d: 0.32, h: 0.02 },
+                { name: '白方垫',  cat: 'decor',   x: -0.1,  z:  0.45, w: 0.32, d: 0.32, h: 0.02 },
+                { name: '白方垫',  cat: 'decor',   x:  1.0,  z:  0.45, w: 0.32, d: 0.32, h: 0.02 },
+                { name: '白方垫',  cat: 'decor',   x:  1.55, z: -0.35, w: 0.32, d: 0.32, h: 0.02 },
+                { name: '小册子',  cat: 'decor',   x: -1.4,  z:  0.45, w: 0.22, d: 0.16, h: 0.02 },
+
+                // ── 会议桌北侧（上侧，z=-1.0）5 把椅子（沿 x 排列，间距 0.8m）──
+                { name: '椅子',    cat: 'furniture', x: -1.6, z: -1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x: -0.8, z: -1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x:  0,   z: -1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x:  0.8, z: -1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x:  1.6, z: -1.0, w: 0.5, d: 0.5, h: 0.95 },
+                // ── 会议桌南侧（下侧，z=+1.0）5 把椅子（同上）──
+                { name: '椅子',    cat: 'furniture', x: -1.6, z:  1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x: -0.8, z:  1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x:  0,   z:  1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x:  0.8, z:  1.0, w: 0.5, d: 0.5, h: 0.95 },
+                { name: '椅子',    cat: 'furniture', x:  1.6, z:  1.0, w: 0.5, d: 0.5, h: 0.95 },
+
+                // ── 右墙（东墙 z≈+2.4）5 把等候椅（沿 x 排列，与桌椅同方向：长边沿 x，椅子正放坐）──
+                { name: '等候椅', cat: 'furniture', x: -1.6, z:  2.4, w: 0.5, d: 0.5, h: 0.9 },
+                { name: '等候椅', cat: 'furniture', x: -0.8, z:  2.4, w: 0.5, d: 0.5, h: 0.9 },
+                { name: '等候椅', cat: 'furniture', x:  0,   z:  2.4, w: 0.5, d: 0.5, h: 0.9 },
+                { name: '等候椅', cat: 'furniture', x:  0.8, z:  2.4, w: 0.5, d: 0.5, h: 0.9 },
+                { name: '等候椅', cat: 'furniture', x:  1.6, z:  2.4, w: 0.5, d: 0.5, h: 0.9 },
+
+                // ── 底部（南墙外侧）：门口深色过道柜（深色短长条，x 中央）──
+                { name: '门口柜', cat: 'furniture', x:  0.2, z: -3.55, w: 1.5, d: 0.4, h: 0.55 }
+            ]
+            // 注意：不定义 walls——房间外壳（底板+四面墙）由 buildRoomScene 按 size 自动生成，
+            // 若这里再画一圈会形成「房中房」两层墙叠在一起
+        };
         // 房间级 3D 独立页面状态（与建筑 3D 的 indoor 完全分离）
         let roomScene = { active:false, name:null, scene:null, camera:null, renderer:null, labelRenderer:null, controls:null, raycaster:null, animId:null, W:14, D:10, FH:6 };
         // 多用户实时位置：users 按 userId 分，各自独立小球 + 轨迹（房间内相对坐标，米，房间中心为原点）
@@ -3318,7 +3537,7 @@
             { ball: 0xfb923c, line: 0xfb923c }, // 橙
             { ball: 0xa78bfa, line: 0xa78bfa }  // 紫
         ];
-        let roomLive = { users: {}, order: [], demo: null };
+        let roomLive = { users: {}, order: [] };
 
         // 上传弹窗
         function openRoomDataModal() { const m = document.getElementById('roomDataModal'); if (m) m.classList.add('show'); }
@@ -3408,13 +3627,17 @@
         // ===== 房间级 3D 独立页面：进入/退出/构建场景 =====
         // 尺寸推断：优先建筑页选中店铺 w/d；否则按房间物品边界；否则默认 12×8
         function roomSizeOf(name) {
+            // 房间模型显式声明 size 时优先采用（如会议室按基站坐标 6×8），否则走默认推导
+            const m = roomModels[name];
+            if (m && m.size && m.size.w && m.size.d) {
+                return { w: m.size.w, d: m.size.d };
+            }
             let w = 12, d = 8;
             if (indoor.active && indoor.floors && indoor.floors[indoor.current]) {
                 const fl = indoor.floors[indoor.current];
                 const e = fl.shops.find(s => s.data && (s.data.name === name || s.data.id === name));
                 if (e && e.data) { if (e.data.w) w = e.data.w; if (e.data.d) d = e.data.d; }
             }
-            const m = roomModels[name];
             if (m && m.items && m.items.length) {
                 let mx = 0, mz = 0;
                 m.items.forEach(it => { mx = Math.max(mx, Math.abs(it.x || 0) + (it.w || 2) / 2); mz = Math.max(mz, Math.abs(it.z || 0) + (it.d || 2) / 2); });
@@ -3550,7 +3773,7 @@
         // 小圆球（体积小）
         function roomBallMesh(color) {
             const m = new THREE.Mesh(
-                new THREE.SphereGeometry(0.6, 16, 16),
+                new THREE.SphereGeometry(0.28, 14, 14),
                 new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.9 })
             );
             m.userData.kind = 'roomball';
@@ -3600,10 +3823,6 @@
             });
             list.innerHTML = html || '<div class="rl-row"><span>暂无用户</span><b>—</b></div>';
         }
-        function roomStopDemo() {
-            if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; }
-            updateStatus('已停止多用户游走演示', 'loading');
-        }
         function roomClearLive(uid) {
             if (uid) {
                 const u = roomLive.users[String(uid)];
@@ -3619,57 +3838,6 @@
             }
             renderRoomLivePanel();
             updateStatus('已清除房间内轨迹', 'loading');
-        }
-        // 房间内随机游走演示（多个用户同时游走）
-        function roomDemo() {
-            if (!roomScene.active) { updateStatus('请先进入房间 3D 模式', 'error'); return; }
-            if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; }
-            const W = roomScene.W / 2 - 1, D = roomScene.D / 2 - 1;
-            const uids = ['用户A', '用户B', '用户C'];
-            // 每人独立位置/速度
-            const walkers = uids.map(() => ({
-                x: (Math.random() - 0.5) * W, z: (Math.random() - 0.5) * D,
-                dx: (Math.random() - 0.5) * 0.8, dz: (Math.random() - 0.5) * 0.8
-            }));
-            roomLive.demo = setInterval(() => {
-                walkers.forEach((w, i) => {
-                    w.dx += (Math.random() - 0.5) * 0.5; w.dz += (Math.random() - 0.5) * 0.5;
-                    w.x = Math.max(-W, Math.min(W, w.x + w.dx)); w.z = Math.max(-D, Math.min(D, w.z + w.dz));
-                    if (Math.abs(w.x) >= W || Math.abs(w.z) >= D) { w.dx = -w.dx * 0.5; w.dz = -w.dz * 0.5; }
-                    roomPush(uids[i], w.x, w.z);
-                });
-            }, 400);
-            updateStatus('房间内多用户随机游走演示已启动（3 人）', 'loading');
-        }
-        // 一键演示：载入随机房间数据并进入房间、启动小球游走
-        function loadRoomDemo() {
-            if (!indoor.active && !roomScene.active) { updateStatus('请先进入 3D 或房间模式', 'error'); return; }
-            let room = roomScene.active ? roomScene.name : null;
-            if (!room && indoor.active && indoor.floors && indoor.floors[indoor.current]) {
-                const fl = indoor.floors[indoor.current];
-                const e = fl.shops.find(s => s.data.id === editSelShopId);
-                if (e) room = e.data.name;
-            }
-            if (!room) { updateStatus('请先选中一个房间', 'error'); return; }
-            // 若该房间尚无数据则生成一份随机数据
-            if (!roomModels[room]) {
-                const rnd = (a, b) => a + Math.random() * (b - a);
-                const items = [];
-                const n = 3 + Math.floor(Math.random() * 4);
-                for (let i = 0; i < n; i++) {
-                    items.push({
-                        name: ['收银台', '展示架', '试衣间', '办公桌', '沙发', '展柜', '饮水机', '绿植'][Math.floor(Math.random() * 8)],
-                        cat: ROOM_CAT_KEYS[Math.floor(Math.random() * ROOM_CAT_KEYS.length)],
-                        x: +rnd(-4, 4).toFixed(1), z: +rnd(-3, 3).toFixed(1),
-                        w: +rnd(1.2, 3).toFixed(1), d: +rnd(1, 2.2).toFixed(1), h: +rnd(0.8, 2.2).toFixed(1),
-                        shape: Math.random() < 0.3 ? 'circle' : 'rect', rot: 0
-                    });
-                }
-                roomModels[room] = { items: items, walls: [] };
-            }
-            if (!roomScene.active) { enterRoom3D(room); }
-            else { disposeRoomScene(); buildRoomScene(room); }
-            roomDemo();
         }
         // 进入房间 3D 建模独立页面
         function enterRoom3D(roomName) {
@@ -3715,7 +3883,6 @@
         }
         // 销毁房间 3D 场景
         function disposeRoomScene() {
-            if (roomLive.demo) { clearInterval(roomLive.demo); roomLive.demo = null; }
             if (roomScene.animId) cancelAnimationFrame(roomScene.animId);
             if (roomScene.controls) roomScene.controls.dispose();
             if (roomScene.scene) {
@@ -3763,8 +3930,6 @@
                 Object.keys(roomLive.users).forEach(k => { const u = roomLive.users[k]; users[k] = { count: u.points.length, current: u.current }; });
                 return { room: roomScene.active ? roomScene.name : null, online: roomLive.order.length, users: users };
             },
-            startDemo() { roomDemo(); return { ok: true }; },
-            stopDemo() { roomStopDemo(); return { ok: true }; },
             // 定位系统后端对接：connect({username, password}) / disconnect()
             async connect(cfg) {
                 if (cfg) {
@@ -3775,7 +3940,12 @@
                 await connectPosBackend();
                 return { ok: POS_BACKEND.enabled, status: (document.getElementById('posStatus') || {}).textContent };
             },
-            disconnect() { disconnectPosBackend(); return { ok: true }; }
+            disconnect() { disconnectPosBackend(); return { ok: true }; },
+            // 客户端角色接口（对齐对接文档）：标签列表 / 单标签轨迹 / 事件
+            tags() { return (POS_BACKEND.tags || []).map(t => ({ device_id: t.device_id, name: t.name, status: t.status, position: t.position })); },
+            async tagDetail(device_id) { await posTagDetail(device_id); return { ok: true }; },
+            async refreshTags() { await posRefreshTags(); return { ok: true }; },
+            async events() { const r = await posApi('/api/v1/events?page_size=20').catch(() => null); return r && r.ok ? await r.json() : { items: [] }; }
         };
 
         // ===== 室内 3D 建模自定义（全局面板控制） =====
@@ -4563,11 +4733,9 @@
                 <button class="return-btn" onclick="exitRoom3D()">← 返回建筑</button>
             </div>
         </div>
-        <!-- 顶部主功能条：多用户实时轨迹（显眼入口，点击演示/接入后端） -->
+        <!-- 顶部主功能条：多用户实时轨迹（显眼入口，接入后端） -->
         <div class="hud room-trackbar" id="roomTrackBar">
             <div class="rt-title">多用户轨迹</div>
-            <button class="rt-btn primary" onclick="roomDemo()">演示 3 人游走</button>
-            <button class="rt-btn" onclick="roomStopDemo()">停止</button>
             <button class="rt-btn danger" onclick="roomClearLive()">清空</button>
             <span class="rt-stat">在线 <b id="rtOnline">0</b> 人 · 轨迹 <b id="rtPts">0</b> 点</span>
         </div>
@@ -4586,6 +4754,14 @@
                 <button class="rl-btn" id="posConnBtn" onclick="togglePosBackend()">连接定位后端</button>
             </div>
             <div id="posStatus" style="margin-top:6px;font-size:11px;color:var(--hud-text-2);">未连接。登录后每 2s 拉取后端标签位置，按 device_id 分色显示在房间中；房间会按标签坐标自动扩大。</div>
+            <!-- 标签状态列表（客户端角色：/tags/positions + /tags/{id}/positions + /tags/{id}/events + /events） -->
+            <div class="rl-ctrl" style="border-top:1px dashed rgba(34,197,94,.3);padding-top:10px;margin-top:10px;justify-content:space-between;align-items:center;">
+                <span style="font-size:12px;font-weight:700;color:#4ade80;">标签状态</span>
+                <button class="rl-btn" id="posRefreshBtn" onclick="posRefreshTags()" style="padding:4px 10px;font-size:11px;">刷新</button>
+            </div>
+            <div id="posTags" style="max-height:150px;overflow-y:auto;font-size:11px;line-height:1.8;"></div>
+            <div id="posTagDetail" style="margin-top:6px;font-size:11px;line-height:1.7;color:var(--hud-text-2);"></div>
+            <div id="posEvents" style="margin-top:8px;border-top:1px dashed rgba(34,197,94,.25);padding-top:6px;font-size:11px;line-height:1.7;color:var(--hud-text-2);max-height:90px;overflow-y:auto;"></div>
         </div>
     </div>
 
