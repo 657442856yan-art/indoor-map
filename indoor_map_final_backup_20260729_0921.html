@@ -3269,11 +3269,19 @@
             return fetch(POS_BACKEND.base + path, Object.assign({ headers: headers }, opts || {}));
         }
         // 登录拿 token；失败抛错由调用方提示
+        // 解析 URL 参数（如 ?backend=http://192.168.1.10:8000）
+        function posUrlParam(name) {
+            try { return new URLSearchParams(window.location.search).get(name) || ''; } catch (e) { return ''; }
+        }
         async function posLogin() {
             const u = document.getElementById('posUser');
             const p = document.getElementById('posPass');
-            // 只用本后端，地址固定为当前页面源（通过 proxy_server.js 同源代理，无 CORS 问题）
-            POS_BACKEND.base = window.location.origin || '';
+            const be = document.getElementById('posBase');
+            // 后端地址优先级：面板输入框 > URL ?backend= > localStorage 记忆 > 当前页面源（同源代理）
+            let base = (be && be.value.trim()) ? be.value.trim() : '';
+            if (!base) base = posUrlParam('backend').trim();
+            if (!base) { try { base = localStorage.getItem('indoor3d_posBase') || ''; } catch (e) {} }
+            POS_BACKEND.base = (base || window.location.origin || '').replace(/\/+$/, '');
             // 输入框留空 → 用默认凭据（打开即用）；否则用输入值并记忆
             let username = u ? u.value.trim() : '';
             let password = p ? p.value : '';
@@ -3282,7 +3290,7 @@
                 if (saved && saved.u && saved.p) { username = saved.u; password = saved.p; }
                 else { username = POS_BACKEND.defaultUser; password = POS_BACKEND.defaultPass; }
             }
-            if (!POS_BACKEND.base || !username || !password) throw new Error('请填写用户名、密码');
+            if (!POS_BACKEND.base || !username || !password) throw new Error('请填写后端地址、用户名、密码');
             const r = await fetch(POS_BACKEND.base + '/api/v1/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3293,6 +3301,8 @@
             POS_BACKEND.token = d.access_token;
             if (u) u.value = username; if (p) p.value = password;
             if (username !== POS_BACKEND.defaultUser || password !== POS_BACKEND.defaultPass) posCredSave(username, password);
+            // 记忆后端地址（非当前源时），下次打开自动沿用
+            if (base) { try { localStorage.setItem('indoor3d_posBase', base); } catch (e) {} }
         }
         // 拉取所有标签最新位置，喂给房间级多用户轨迹
         async function posPoll() {
@@ -4644,7 +4654,12 @@
                     if (!POS_BACKEND.enabled && /^https?:$/.test(window.location.protocol)) {
                         // 预填默认凭据到输入框（仅默认账号时，方便用户在面板里看到当前账号）
                         const u = document.getElementById('posUser'), p = document.getElementById('posPass');
+                        const be = document.getElementById('posBase');
                         const saved = posCredLoad();
+                        // 后端地址预填：URL ?backend= 优先，其次 localStorage 记忆，最后留空=当前源
+                        let initBase = posUrlParam('backend').trim();
+                        if (!initBase) { try { initBase = localStorage.getItem('indoor3d_posBase') || ''; } catch (e) {} }
+                        if (be && !be.value && initBase) be.value = initBase;
                         if (u && !u.value) u.value = (saved && saved.u) || POS_BACKEND.defaultUser;
                         if (p && !p.value) p.value = (saved && saved.p) || POS_BACKEND.defaultPass;
                         connectPosBackend();
@@ -4782,11 +4797,12 @@
                 调用：<code>IndoorRoomAPI.push({id:'用户A', x:1.5, z:-0.8})</code>（id 缺省为 u1；同房间多用户各自独立轨迹）
             </div>
             <div class="rl-ctrl" style="border-top:1px dashed rgba(34,197,94,.3);padding-top:10px;margin-top:10px;">
+                <input id="posBase" class="lb-input" placeholder="后端地址（留空=当前站点，如 http://192.168.x.x:8000）" style="flex:1 1 100%;">
                 <input id="posUser" class="lb-input" placeholder="用户名（留空用默认）" style="flex:1;">
                 <input id="posPass" type="password" class="lb-input" placeholder="密码（留空用默认）" style="flex:1;">
                 <button class="rl-btn" id="posConnBtn" onclick="togglePosBackend()">连接定位后端</button>
             </div>
-            <div id="posStatus" style="margin-top:6px;font-size:11px;color:var(--hud-text-2);">打开页面后自动连接（默认账号），无需手动填写；也可断开后换账号重连。每 2s 拉取标签位置，按 device_id 分色显示在房间中。</div>
+            <div id="posStatus" style="margin-top:6px;font-size:11px;color:var(--hud-text-2);">打开页面后自动连接（默认账号），无需手动填写；也可断开后换账号重连。每 2s 拉取标签位置，按 device_id 分色显示在房间中。后端地址可用 ?backend=http://ip:8000 指定。</div>
             <!-- 标签状态列表（客户端角色：/tags/positions + /tags/{id}/positions + /tags/{id}/events + /events） -->
             <div class="rl-ctrl" style="border-top:1px dashed rgba(34,197,94,.3);padding-top:10px;margin-top:10px;justify-content:space-between;align-items:center;">
                 <span style="font-size:12px;font-weight:700;color:#4ade80;">标签状态</span>
